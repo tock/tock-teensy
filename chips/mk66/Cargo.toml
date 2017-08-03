@@ -1,0 +1,19 @@
+[package]
+name = "mk66"
+version = "0.1.0"
+authors = ["Shane Leonard <shanel@stanford.edu>"]
+
+[profile.dev]
+panic = "abort"
+lto = true
+opt-level = 0
+debug = true
+
+[profile.release]
+panic = "abort"
+lto = true
+
+[dependencies]
+kernel = { path = "../../tock/kernel" }
+cortexm4 = { path = "../../tock/arch/cortex-m4" }
+capsules = { path = "../../tock/capsules" }
