@@ -7,5 +7,8 @@ TEENSY_LOADER=teensy_loader_cli
 include ../../tock/boards/Makefile.common
 
 .PHONY: program
-program: $(TOCK_BOARD)/target/$(TARGET)/release/$(PLATFORM).hex
+program: target/$(TARGET)/release/$(PLATFORM).hex
 	$(TEENSY_LOADER) -mmcu=$(MCU) -v -w $<
+
+target/$(TARGET)/release/$(PLATFORM).hex: target/$(TARGET)/release/$(PLATFORM).elf
+	$(Q)$(OBJCOPY) -Oihex $^ $@

@@ -1,6 +1,6 @@
 #![crate_name = "mk66"]
 #![crate_type = "rlib"]
-#![feature(asm,core_intrinsics,concat_idents,const_fn)]
+#![feature(asm,core_intrinsics,concat_idents,const_fn,associated_consts)]
 #![no_std]
 
 extern crate cortexm4;
@@ -14,6 +14,9 @@ mod helpers;
 
 pub mod chip;
 pub mod nvic;
+pub mod wdog;
+pub mod gpio;
+pub mod sim;
 
 // TODO: Should this be moved to the cortexm crate?
 unsafe extern "C" fn unhandled_interrupt() {
