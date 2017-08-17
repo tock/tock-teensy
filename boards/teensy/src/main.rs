@@ -7,6 +7,9 @@ extern crate compiler_builtins;
 extern crate kernel;
 
 #[allow(dead_code)]
+extern crate kernel_tests;
+
+#[allow(dead_code)]
 extern crate mk66;
 
 #[macro_use]
@@ -37,9 +40,7 @@ pub static FLASH_CONFIG_BYTES: [u8; 16] = [
 #[no_mangle]
 pub unsafe fn reset_handler() {
     use mk66::wdog;
-    use mk66::gpio;
     use mk66::sim;
-    use kernel::hil::Controller;
 
     // Disable the watchdog
     wdog::WDOG.stop();
@@ -49,22 +50,17 @@ pub unsafe fn reset_handler() {
 
     mk66::init();
 
-    // Turn on the LED
-    let led = gpio::PC05.make_gpio();
-    led.enable_output();
-    led.set();
-
-    // Example configuration for the pin functions
-    gpio::PB16.configure(gpio::functions::UART0_RX);
-    gpio::PB17.configure(gpio::functions::UART0_TX);
-
     let teensy = Teensy {
         ipc: kernel::ipc::IPC::new(),
     };
 
     let mut chip = mk66::chip::MK66::new();
 
-    kernel::main(&teensy, &mut chip, load_processes(), &teensy.ipc);
+    if kernel_tests::TEST {
+        kernel_tests::test();
+    } else {
+        kernel::main(&teensy, &mut chip, load_processes(), &teensy.ipc);
+    }
 }
 
 
