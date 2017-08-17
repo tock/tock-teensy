@@ -1,3 +1,4 @@
 .ops.yaml
 .vimrc
 target/
+.DS_Store
