@@ -58,6 +58,7 @@ pub unsafe fn reset_handler() {
 
     if kernel_tests::TEST {
         kernel_tests::test();
+        loop {}
     } else {
         kernel::main(&teensy, &mut chip, load_processes(), &teensy.ipc);
     }

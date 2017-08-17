@@ -26,8 +26,6 @@ the normal kernel main loop. To run `blink` from the kernel, edit
 // Set this function to run whatever test you desire. Test functions are named XXX_test by convention.
 pub fn test() {
     blink::blink_test();
-
-    loop {}
 }
 
 // Set this to true to make the kernel run the test instead of main.
