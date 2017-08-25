@@ -6,14 +6,16 @@ extern crate compiler_builtins;
 extern crate kernel;
 
 #[allow(dead_code)]
+#[macro_use]
 extern crate mk66;
 
 // Test modules
 mod blink;
+mod registers;
 
 // Set this function to run whatever test you desire. Test functions are named XXX_test by convention.
 pub fn test() {
-    blink::blink_test();
+    registers::register_test();
 }
 
 // Set this to true to make the kernel run the test instead of main.

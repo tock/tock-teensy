@@ -12,11 +12,16 @@ extern crate kernel;
 #[macro_use]
 mod helpers;
 
+#[macro_use]
+pub mod regs;
+
 pub mod chip;
 pub mod nvic;
 pub mod wdog;
 pub mod gpio;
 pub mod sim;
+pub mod mcg;
+pub mod osc;
 
 // TODO: Should this be moved to the cortexm crate?
 unsafe extern "C" fn unhandled_interrupt() {
