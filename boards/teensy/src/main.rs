@@ -46,7 +46,7 @@ pub unsafe fn reset_handler() {
     wdog::WDOG.stop();
 
     // Enable the Port Control and Interrupt clocks
-    sim::enable_clock(sim::clocks::PORTABCDE);
+    sim::SIM.enable_clock(sim::clocks::PORTABCDE);
 
     mk66::init();
 

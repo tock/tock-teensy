@@ -1,6 +1,7 @@
 //! Implementation of the MK66 System Integration Module
 
 use kernel::common::VolatileCell;
+use core::mem;
 
 #[repr(C, packed)]
 struct Registers {
@@ -31,8 +32,6 @@ struct Registers {
     clkdiv3: VolatileCell<u32>,
     clkdiv4: VolatileCell<u32>,
 }
-
-const SIM: *mut Registers = 0x40048004 as *mut Registers;
 
 pub enum Clock {
     Group1(Group1Clock),
@@ -204,36 +203,68 @@ pub mod clocks {
     pub const SDRAMC: Clock = Group7(Group7Clock::SDRAMC);
 }
 
+pub struct Sim {
+    regs: *mut Registers
+}
 
-pub unsafe fn enable_clock(clock: Clock) {
-    match clock {
-        Clock::Group1(clock_mask) => {
-            let scgc: u32 = (*SIM).scgc1.get();
-            (*SIM).scgc1.set(scgc | (clock_mask as u32));
-        },
-        Clock::Group2(clock_mask) => {
-            let scgc: u32 = (*SIM).scgc2.get();
-            (*SIM).scgc2.set(scgc | (clock_mask as u32));
-        },
-        Clock::Group3(clock_mask) => {
-            let scgc: u32 = (*SIM).scgc3.get();
-            (*SIM).scgc3.set(scgc | (clock_mask as u32));
-        },
-        Clock::Group4(clock_mask) => {
-            let scgc: u32 = (*SIM).scgc4.get();
-            (*SIM).scgc4.set(scgc | (clock_mask as u32));
-        },
-        Clock::Group5(clock_mask) => {
-            let scgc: u32 = (*SIM).scgc5.get();
-            (*SIM).scgc5.set(scgc | (clock_mask as u32));
-        },
-        Clock::Group6(clock_mask) => {
-            let scgc: u32 = (*SIM).scgc6.get();
-            (*SIM).scgc6.set(scgc | (clock_mask as u32));
-        },
-        Clock::Group7(clock_mask) => {
-            let scgc: u32 = (*SIM).scgc7.get();
-            (*SIM).scgc7.set(scgc | (clock_mask as u32));
-        },
-    };
+pub static mut SIM: Sim = Sim::new();
+
+const BASE_ADDRESS: *mut Registers = 0x40048004 as *mut Registers;
+
+impl Sim {
+
+    const fn new() -> Sim {
+        Sim {
+            regs: BASE_ADDRESS
+        }
+    }
+
+    pub fn enable_clock(&self, clock: Clock) {
+        let regs: &mut Registers = unsafe { mem::transmute(self.regs) };
+
+        match clock {
+            Clock::Group1(clock_mask) => {
+                let scgc: u32 = regs.scgc1.get();
+                regs.scgc1.set(scgc | (clock_mask as u32));
+            },
+            Clock::Group2(clock_mask) => {
+                let scgc: u32 = regs.scgc2.get();
+                regs.scgc2.set(scgc | (clock_mask as u32));
+            },
+            Clock::Group3(clock_mask) => {
+                let scgc: u32 = regs.scgc3.get();
+                regs.scgc3.set(scgc | (clock_mask as u32));
+            },
+            Clock::Group4(clock_mask) => {
+                let scgc: u32 = regs.scgc4.get();
+                regs.scgc4.set(scgc | (clock_mask as u32));
+            },
+            Clock::Group5(clock_mask) => {
+                let scgc: u32 = regs.scgc5.get();
+                regs.scgc5.set(scgc | (clock_mask as u32));
+            },
+            Clock::Group6(clock_mask) => {
+                let scgc: u32 = regs.scgc6.get();
+                regs.scgc6.set(scgc | (clock_mask as u32));
+            },
+            Clock::Group7(clock_mask) => {
+                let scgc: u32 = regs.scgc7.get();
+                regs.scgc7.set(scgc | (clock_mask as u32));
+            },
+        };
+    }
+
+    pub fn set_dividers(&self, core: u32, bus: u32, flash: u32) {
+        let regs: &mut Registers = unsafe { mem::transmute(self.regs) };
+
+        const CORE_SHIFT: usize = 28;
+        const BUS_SHIFT: usize = 24;
+        const FLASH_SHIFT: usize = 16;
+        const MASK: u32 = 0b1111;
+        let clkdiv: u32 = ((core - 1) & MASK) << CORE_SHIFT |
+                          ((bus - 1) & MASK) << BUS_SHIFT |
+                          ((flash - 1) & MASK) << FLASH_SHIFT;
+
+        regs.clkdiv1.set(clkdiv);
+    }
 }
