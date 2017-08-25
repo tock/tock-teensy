@@ -44,8 +44,8 @@ impl<T: IntLike> RW<T> {
     }
 
     #[inline]
-    pub fn read(&self, field: FieldMask<T>) -> T
-        where FieldMask<T>: Field<T> {
+    pub fn read(&self, field: Field<T>) -> T
+    {
         (self.get() & (field.mask << field.shift)) >> field.shift
     }
 
@@ -61,9 +61,8 @@ impl<T: IntLike> RW<T> {
     }
 
     #[inline]
-    pub fn is_set(&self, field: FieldMask<T>) -> bool 
-        where FieldMask<T>: Field<T>,
-              T: PartialEq<u8> {
+    pub fn is_set(&self, field: Field<T>) -> bool 
+        where T: PartialEq<u8> {
         self.read(field) != 0
     }
 
@@ -86,15 +85,14 @@ impl<T: IntLike> RO<T> {
     }
 
     #[inline]
-    pub fn read(&self, field: FieldMask<T>) -> T
-        where FieldMask<T>: Field<T> {
+    pub fn read(&self, field: Field<T>) -> T
+    {
         (self.get() & (field.mask << field.shift)) >> field.shift
     }
 
     #[inline]
-    pub fn is_set(&self, field: FieldMask<T>) -> bool 
-        where FieldMask<T>: Field<T>,
-              T: PartialEq<u8> {
+    pub fn is_set(&self, field: Field<T>) -> bool 
+        where T: PartialEq<u8> {
         self.read(field) != 0
     }
 
@@ -122,38 +120,38 @@ impl<T: IntLike> WO<T> {
     }
 }
 
-pub struct FieldMask<T: IntLike> {
+pub struct Field<T: IntLike> {
     mask: T,
     shift: u32
 }
 
-pub trait Field<T: IntLike> {
-    fn val(&self, value: T) -> FieldValue<T>;
-}
-
-// For the FieldMask, the mask is unshifted, ie. the LSB should always be set
-impl<T: IntLike> FieldMask<T> {
-    pub const fn new(mask: T, shift: u32) -> FieldMask<T> {
-        FieldMask {
+// For the Field, the mask is unshifted, ie. the LSB should always be set
+impl Field<u8> {
+    pub const fn new(mask: u8, shift: u32) -> Field<u8> {
+        Field {
             mask: mask,
             shift: shift
         }
     }
-}
 
-// Necessary to split the implementation of u8 and u32 because of the split FieldValue
-// implementations.
-impl Field<u8> for FieldMask<u8> {
-    fn val(&self, value: u8) -> FieldValue<u8> {
+    pub fn val(&self, value: u8) -> FieldValue<u8> {
         FieldValue::<u8>::new(self.mask, self.shift, value)
     }
 }
 
-impl Field<u32> for FieldMask<u32> {
-    fn val(&self, value: u32) -> FieldValue<u32> {
+impl Field<u32> {
+    pub const fn new(mask: u32, shift: u32) -> Field<u32> {
+        Field {
+            mask: mask,
+            shift: shift
+        }
+    }
+
+    pub fn val(&self, value: u32) -> FieldValue<u32> {
         FieldValue::<u32>::new(self.mask, self.shift, value)
     }
 }
+
 
 // For the FieldValue, the masks and values are shifted into their actual location in the register
 pub struct FieldValue<T: IntLike> {

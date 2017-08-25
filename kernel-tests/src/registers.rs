@@ -1,42 +1,20 @@
 #[allow(unused)]
 
-use common::regs::{RW, Field};
+use common::regs::RW;
 
 struct Registers {
     c1: RW<u8>,
-    c2: RW<u8>
 }
 
-// Some made up register fields, defined manually.
-#[allow(non_snake_case)]
-pub mod C1 {
-    use common::regs::FieldMask;
-
-    #[allow(non_upper_case_globals)]
-    pub const CLKS: FieldMask<u8> = FieldMask::new(0b11, 6);
-
-    #[allow(non_upper_case_globals)]
-    pub const PRDIV: FieldMask<u8> = FieldMask::new(0b11, 4);
-
-    #[allow(non_snake_case)]
-    pub mod PRDIV {
-        use common::regs::FieldValue;
-
-        #[allow(non_upper_case_globals)]
-        pub const Div32: FieldValue<u8> = FieldValue::<u8>::new(0b11, 4, 2);
-    }
-}
-
-// Some made up register fields (expands to the same thing as the C1 module above).
+// Some made up register fields.
 bitfields! { u8,
-    C2 [
+    C1 [
         CLKS  (0b11, 6) [],
         PRDIV (0b11, 4) [
             Div32 = 2
         ]
     ]
 }
-
 
 static mut BASE: *mut Registers = 0x2000_0000 as *mut Registers;
 
@@ -54,19 +32,5 @@ pub fn register_test() {
                       C1::PRDIV::Div32);
 
         while regs.c1.read(C1::CLKS) != 1 {}
-
-        asm!{"nop"::::"volatile"};
-        asm!{"nop"::::"volatile"};
-        asm!{"nop"::::"volatile"};
-
-        regs.c2.set(1 << 5);
-
-        regs.c2.modify(C2::CLKS.val(3) +
-                       C2::PRDIV.val(1));
-
-        regs.c2.write(C2::CLKS.val(1) +
-                      C2::PRDIV::Div32);
-
-        while regs.c2.read(C2::CLKS) != 1 {}
     }
 }

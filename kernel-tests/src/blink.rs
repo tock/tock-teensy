@@ -35,8 +35,8 @@ pub fn fast_blink_test() {
     use mk66::sim;
 
     unsafe { 
-        osc::OSC.enable(); 
-        sim::SIM.set_dividers(1, 2, 3);
+        osc::enable(osc::OscCapacitance::Load_10pF); 
+        sim::set_dividers(1, 2, 3);
     }
 
     if let mcg::State::Fei(fei) = mcg::state() {
@@ -44,9 +44,9 @@ pub fn fast_blink_test() {
         fei.enable_xtal(mcg::OscRange::VeryHigh);
         let fbe = fei.use_external(mcg::Frdiv::Low16_High512);
 
-        // let pbe = fbe.enable_pll(27, 6);
+        let pbe = fbe.enable_pll(27, 6);
 
-        // pbe.use_pll();
+        pbe.use_pll();
     } else {
     }
 
