@@ -13,7 +13,7 @@ extern crate kernel;
 mod helpers;
 
 #[macro_use]
-pub mod regs;
+extern crate common;
 
 pub mod chip;
 pub mod nvic;

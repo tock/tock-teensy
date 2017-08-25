@@ -6,8 +6,10 @@ extern crate compiler_builtins;
 extern crate kernel;
 
 #[allow(dead_code)]
-#[macro_use]
 extern crate mk66;
+
+#[macro_use]
+extern crate common;
 
 // Test modules
 mod blink;

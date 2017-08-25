@@ -1,6 +1,6 @@
 #[allow(unused)]
 
-use mk66::regs::{RW, Field};
+use common::regs::{RW, Field};
 
 struct Registers {
     c1: RW<u8>,
@@ -10,7 +10,7 @@ struct Registers {
 // Some made up register fields, defined manually.
 #[allow(non_snake_case)]
 pub mod C1 {
-    use mk66::regs::FieldMask;
+    use common::regs::FieldMask;
 
     #[allow(non_upper_case_globals)]
     pub const CLKS: FieldMask<u8> = FieldMask::new(0b11, 6);
@@ -20,7 +20,7 @@ pub mod C1 {
 
     #[allow(non_snake_case)]
     pub mod PRDIV {
-        use mk66::regs::FieldValue;
+        use common::regs::FieldValue;
 
         #[allow(non_upper_case_globals)]
         pub const Div32: FieldValue<u8> = FieldValue::<u8>::new(0b11, 4, 2);

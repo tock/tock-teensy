@@ -1,7 +1,7 @@
 //! Implementation of the Multipurpose Clock Generator
 //!
 
-use regs::{Field, RW, RO};
+use common::regs::{Field, RW, RO};
 use ::core::mem;
 
 const MCG: *mut Registers = 0x4006_4000 as *mut Registers;
