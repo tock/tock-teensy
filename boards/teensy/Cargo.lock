@@ -6,7 +6,6 @@ dependencies = [
  "common 0.1.0",
  "cortexm4 0.1.0",
  "kernel 0.1.0",
- "kernel_tests 0.1.0",
  "mk66 0.1.0",
 ]
 
@@ -31,17 +30,6 @@ dependencies = [
 [[package]]
 name = "kernel"
 version = "0.1.0"
-
-[[package]]
-name = "kernel_tests"
-version = "0.1.0"
-dependencies = [
- "capsules 0.1.0",
- "common 0.1.0",
- "cortexm4 0.1.0",
- "kernel 0.1.0",
- "mk66 0.1.0",
-]
 
 [[package]]
 name = "mk66"

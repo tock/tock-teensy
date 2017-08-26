@@ -176,7 +176,7 @@ impl<P: PinNum> Pin<P> {
     pub fn make_gpio(&self) -> &Gpio {
         let already_allocated = self.valid.swap(true, Ordering::Relaxed);
         if already_allocated {
-            panic!("TODO");
+            panic!("Requested GPIO pin {} is already allocated.", self.gpio.pin);
         }
 
         self.set_peripheral_function(PeripheralFunction::Alt1);

@@ -6,25 +6,27 @@ use kernel::hil::uart;
 use core::mem;
 use nvic;
 use regs::uart::*;
+use sim;
+use clock;
 
-pub struct UART {
+pub struct Uart {
+    index: usize,
     registers: *mut Registers,
     client: Cell<Option<&'static uart::Client>>,
 }
 
-pub static mut UART0: UART = UART::new(UART_BASE_ADDRS[0]);
-pub static mut UART1: UART = UART::new(UART_BASE_ADDRS[1]);
-pub static mut UART2: UART = UART::new(UART_BASE_ADDRS[2]);
-pub static mut UART3: UART = UART::new(UART_BASE_ADDRS[3]);
-pub static mut UART4: UART = UART::new(UART_BASE_ADDRS[4]);
+pub static mut UART0: Uart = Uart::new(0);
+pub static mut UART1: Uart = Uart::new(1);
+pub static mut UART2: Uart = Uart::new(2);
+pub static mut UART3: Uart = Uart::new(3);
+pub static mut UART4: Uart = Uart::new(4);
 
-pub const UART_MODULE_CLOCK: u32 = 10_200_000;
-
-impl UART {
-    pub const fn new(base_addr: *mut Registers) -> UART {
-        UART {
-            registers: base_addr,
-            client: Cell::new(None),
+impl Uart {
+    pub const fn new(index: usize) -> Uart {
+        Uart {
+            index: index,
+            registers: UART_BASE_ADDRS[index],
+            client: Cell::new(None)
         }
     }
 
@@ -35,51 +37,99 @@ impl UART {
     pub fn handle_error(&self) {
         // TODO: implement
     }
-}
 
-
-/// Implementation of kernel::hil::UART
-impl hil::uart::UART for UART {
-    fn set_client(&self, client: &'static hil::uart::Client) {
-        self.client.set(Some(client));
-    }
-
-    fn init(&self, params: uart::UARTParams) {
+    fn set_parity(&self, parity: hil::uart::Parity) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
 
-        let parity = match params.parity {
+        let (pe, pt) = match parity {
             hil::uart::Parity::None => (C1::PE::False, C1::PT::Even),
             hil::uart::Parity::Even => (C1::PE::True, C1::PT::Even),
             hil::uart::Parity::Odd => (C1::PE::True, C1::PT::Odd)
         };
 
-        let stop_bits = match params.stop_bits {
-            hil::uart::StopBits::One => BDH::SBNS::One, 
-            hil::uart::StopBits::Two => BDH::SBNS::Two
-        };
-
-        // Baud rate generation.
-        let baud_rate: u32 = (UART_MODULE_CLOCK >> 4) / params.baud_rate;
-
         // This basic procedure outlined in section 59.9.3.
         // Set control register 1, which configures the parity.
-        regs.c1.write(parity.0 + 
-                      parity.1 + 
-                      C1::LOOPS::False + 
+        regs.c1.write(pe + pt +
+                      C1::LOOPS::False +
                       C1::UARTSWAI::False +
                       C1::RSRC::False +
                       C1::M::EightBit +
                       C1::WAKE::Idle +
                       C1::ILT::AfterStart);
+    }
 
-        // Set the baud rate and stop bits.
-        regs.bdh.modify(stop_bits +
-                        BDH::SBR.val((baud_rate >> 8) as u8));
-        
-        regs.bdl.set(baud_rate as u8);
+    fn set_stop_bits(&self, stop_bits: hil::uart::StopBits) {
+        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
 
-        // Enable the transmitter and receiver.
-        regs.c2.write(C2::RE::True + C2::TE::True);
+        let stop_bits = match stop_bits {
+            hil::uart::StopBits::One => BDH::SBNS::One,
+            hil::uart::StopBits::Two => BDH::SBNS::Two
+        };
+
+        regs.bdh.modify(stop_bits);
+    }
+
+    fn set_baud_rate(&self, baud_rate: u32) {
+        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
+
+        // Baud rate generation. Note that UART0 and UART1 are sourced from the core clock, not the
+        // bus clock.
+        let uart_clock = match self.index {
+            0 | 1 => clock::core_clock_hz(),
+            _ => clock::peripheral_clock_hz()
+        };
+
+        let baud_counter: u32 = (uart_clock >> 4) / baud_rate;
+
+        // Set the baud rate.
+        regs.c4.modify(C4::BRFA.val(0));
+        regs.bdh.modify(BDH::SBR.val((baud_counter >> 8) as u8));
+        regs.bdl.set(baud_counter as u8);
+    }
+
+    pub fn enable_rx(&self) {
+        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
+        regs.c2.write(C2::RE::True);
+    }
+
+    pub fn enable_tx(&self) {
+        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
+        regs.c2.write(C2::TE::True);
+    }
+
+    fn enable_clock(&self) {
+        sim::enable_clock(sim::clocks::UART[self.index]);
+    }
+
+    pub fn send_byte(&self, byte: u8) {
+        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
+
+        while !regs.s1.is_set(S1::TRDE) {}
+        regs.d.set(byte);
+    }
+
+    pub fn tx_ready(&self) -> bool {
+        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
+        regs.s1.is_set(S1::TC)
+    }
+}
+
+
+/// Implementation of kernel::hil::UART
+impl hil::uart::UART for Uart {
+    fn set_client(&self, client: &'static hil::uart::Client) {
+        self.client.set(Some(client));
+    }
+
+    fn init(&self, params: uart::UARTParams) {
+        self.enable_clock();
+
+        self.set_parity(params.parity);
+        self.set_stop_bits(params.stop_bits);
+        self.set_baud_rate(params.baud_rate);
+
+        self.enable_rx();
+        self.enable_tx();
     }
 
     #[allow(unused_variables)]
@@ -87,10 +137,11 @@ impl hil::uart::UART for UART {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
 
         // This basic procedure outlined in section 59.9.3.
-        for i in 0..tx_len {
-            while !regs.s1.is_set(S1::TRDE) {}
-            regs.d.set(tx_data[i]);
+        for i in 0..tx_data.len() {
+            self.send_byte(tx_data[i]);
         }
+
+        while !self.tx_ready() {}
     }
 
     #[allow(unused_variables)]

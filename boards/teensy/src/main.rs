@@ -6,14 +6,18 @@ extern crate capsules;
 extern crate compiler_builtins;
 extern crate kernel;
 
-#[allow(dead_code)]
-extern crate kernel_tests;
+#[macro_use]
+extern crate common;
 
 #[allow(dead_code)]
 extern crate mk66;
 
 #[macro_use]
 pub mod io;
+
+#[allow(dead_code)]
+mod tests;
+
 
 #[allow(unused)]
 struct Teensy {
@@ -39,16 +43,18 @@ pub static FLASH_CONFIG_BYTES: [u8; 16] = [
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
-    use mk66::wdog;
-    use mk66::sim;
+    use mk66::{wdog, sim, gpio};
 
     // Disable the watchdog
-    wdog::WDOG.stop();
+    wdog::stop();
 
     // Enable the Port Control and Interrupt clocks
     sim::enable_clock(sim::clocks::PORTABCDE);
 
     mk66::init();
+
+    gpio::PB17.set_function(gpio::functions::UART0_TX);
+    gpio::PB16.set_function(gpio::functions::UART0_RX);
 
     let teensy = Teensy {
         ipc: kernel::ipc::IPC::new(),
@@ -56,8 +62,8 @@ pub unsafe fn reset_handler() {
 
     let mut chip = mk66::chip::MK66::new();
 
-    if kernel_tests::TEST {
-        kernel_tests::test();
+    if tests::TEST {
+        tests::test();
         loop {}
     } else {
         kernel::main(&teensy, &mut chip, load_processes(), &teensy.ipc);

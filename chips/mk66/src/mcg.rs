@@ -44,36 +44,50 @@ pub fn state() -> State {
     let lp = mcg.c2.is_set(C2::LP);
 
     match (clks, irefs, plls, lp) {
-        (OscSource::LockedLoop, true, false, _) => State::Fei(Fei {}),
+        (OscSource::LockedLoop, true, false, _) => State::Fei(Fei),
         (OscSource::LockedLoop, false, false, _) => State::Fee,
         (OscSource::Internal, true, false, false) => State::Fbi,
-        (OscSource::External, false, false, false) => State::Fbe(Fbe {}),
+        (OscSource::External, false, false, false) => State::Fbe(Fbe),
         (OscSource::LockedLoop, false, true, _) => State::Pee,
-        (OscSource::External, false, true, false) => State::Pbe(Pbe {}),
+        (OscSource::External, false, true, false) => State::Pbe(Pbe),
         (OscSource::Internal, true, false, true) => State::Blpi,
         (OscSource::External, false, _, true) => State::Blpe,
-        _ => State::Fei(Fei {})
+        _ => panic!("Not in a recognized power mode!")
     }
+}
+
+pub struct Xtal {
+    pub range: OscRange, 
+    pub frdiv: Frdiv,
+    pub load: ::osc::OscCapacitance
+}
+
+pub mod xtals {
+    use mcg::{Xtal, OscRange, Frdiv};
+    use osc::OscCapacitance;
+
+    #[allow(non_upper_case_globals)]
+    pub const Teensy16MHz: Xtal = Xtal { 
+        range: OscRange::VeryHigh, 
+        frdiv: Frdiv::Low16_High512,
+        load: OscCapacitance::Load_10pF
+    };
 }
 
 // Source: https://branan.github.io/teensy/2017/01/28/uart.html
 impl Fei {
-    pub fn enable_xtal(self, range: OscRange) {
+    pub fn use_xtal(self, xtal: Xtal) -> Fbe {
         let mcg: &mut Registers = unsafe { mem::transmute(MCG) };
-        mcg.c2.modify(C2::RANGE.val(range as u8) +
+
+        mcg.c2.modify(C2::RANGE.val(xtal.range as u8) +
                       C2::EREFS::True);
 
-        while !mcg.s.is_set(S::OSCINIT0) {}
-    }
-
-    pub fn use_external(self, divide: Frdiv) -> Fbe {
-        let mcg: &mut Registers = unsafe { mem::transmute(MCG) };
-
         mcg.c1.write(C1::CLKS::External +
-                     C1::FRDIV.val(divide as u8) +
+                     C1::FRDIV.val(xtal.frdiv as u8) +
                      C1::IREFS::False);
 
-        while !mcg.s.matches(S::IREFST::False + 
+        while !mcg.s.matches(S::OSCINIT0::True + 
+                             S::IREFST::False + 
                              S::CLKST::External) {}
 
         Fbe { }

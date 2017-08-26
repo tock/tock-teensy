@@ -123,6 +123,12 @@ bitfields! {u8,
         FEIE 1,
         PEIE 0
     ],
+    C4 [
+        MAEN1 7 [],
+        MAEN2 6 [],
+        M10 5 [],
+        BRFA (0b11111, 0) []
+    ],
     C5 [
         TDMAS 7,
         RDMAS 5

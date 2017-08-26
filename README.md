@@ -18,9 +18,9 @@ onto the board using the Teensy's builtin HalfKay bootloader.
 
 ## Blink
 
-The `kernel-tests` directory contains tests which can be run instead of running
+The `boards/teensy/src/tests` directory contains tests which can be run instead of running
 the normal kernel main loop. To run `blink` from the kernel, edit
-`kernel-tests/src/lib.rs` to the following:
+`tests/mod.rs` to the following:
 
 ```rust
 // Set this function to run whatever test you desire. Test functions are named XXX_test by convention.
@@ -34,3 +34,5 @@ pub const TEST: bool = true;
 
 Then run `make program` and the kernel will be compiled and flashed to your
 Teensy. You should see the orange LED blinking!
+
+To get a blink with UART console output on TX0, run `print::print_test()` instead.

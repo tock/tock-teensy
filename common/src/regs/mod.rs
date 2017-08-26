@@ -13,6 +13,7 @@ pub trait IntLike: BitAnd<Output=Self> +
                    Shl<u32, Output=Self> + Copy + Clone {}
 
 impl IntLike for u8 {}
+impl IntLike for u16 {}
 impl IntLike for u32 {}
 
 pub struct RW<T: IntLike> {
@@ -120,6 +121,7 @@ impl<T: IntLike> WO<T> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Field<T: IntLike> {
     mask: T,
     shift: u32
@@ -139,6 +141,19 @@ impl Field<u8> {
     }
 }
 
+impl Field<u16> {
+    pub const fn new(mask: u16, shift: u32) -> Field<u16> {
+        Field {
+            mask: mask,
+            shift: shift
+        }
+    }
+
+    pub fn val(&self, value: u16) -> FieldValue<u16> {
+        FieldValue::<u16>::new(self.mask, self.shift, value)
+    }
+}
+
 impl Field<u32> {
     pub const fn new(mask: u32, shift: u32) -> Field<u32> {
         Field {
@@ -154,6 +169,7 @@ impl Field<u32> {
 
 
 // For the FieldValue, the masks and values are shifted into their actual location in the register
+#[derive(Copy, Clone)]
 pub struct FieldValue<T: IntLike> {
     mask: T,
     value: T
@@ -163,6 +179,15 @@ pub struct FieldValue<T: IntLike> {
 // as const when the type is generic
 impl FieldValue<u8> {
     pub const fn new(mask: u8, shift: u32, value: u8) -> Self {
+        FieldValue {
+            mask: mask << shift,
+            value: (value << shift) & (mask << shift)
+        }
+    }
+}
+
+impl FieldValue<u16> {
+    pub const fn new(mask: u16, shift: u32, value: u16) -> Self {
         FieldValue {
             mask: mask << shift,
             value: (value << shift) & (mask << shift)

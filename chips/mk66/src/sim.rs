@@ -5,6 +5,7 @@ use regs::sim::*;
 use common::regs::FieldValue;
 
 pub type Clock = (u32, FieldValue<u32>);
+
 pub mod clocks {
     use sim::Clock;
     use regs::sim::*;
@@ -41,6 +42,8 @@ pub mod clocks {
     pub const I2C0: Clock = (4, SCGC4::I2C0::True);
     pub const CMT: Clock = (4, SCGC4::CMT::True);
     pub const EWM: Clock = (4, SCGC4::EWM::True);
+
+    pub const UART: [Clock; 5] = [UART0, UART1, UART2, UART3, UART4];
 
     pub const PORTE: Clock = (5, SCGC5::PORT::E);
     pub const PORTD: Clock = (5, SCGC5::PORT::D);
@@ -95,5 +98,6 @@ pub fn set_dividers(core: u32, bus: u32, flash: u32) {
 
     regs.clkdiv1.modify(CLKDIV1::Core.val(core - 1) + 
                         CLKDIV1::Bus.val(bus - 1) + 
+                        CLKDIV1::FlexBus.val(bus - 1) +
                         CLKDIV1::Flash.val(flash - 1));
 }

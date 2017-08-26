@@ -25,6 +25,7 @@ pub mod sim;
 pub mod mcg;
 pub mod osc;
 pub mod uart;
+pub mod clock;
 
 // TODO: Should this be moved to the cortexm crate?
 unsafe extern "C" fn unhandled_interrupt() {
@@ -196,6 +197,8 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 99] = [
 ];
 
 pub unsafe fn init() {
+    // TODO: Enable the FPU (SCB_CPACR) and LMEM_PCCCR.
+
     // Relocate data segment.
     // Assumes data starts right after text segment as specified by the linker
     // file.
