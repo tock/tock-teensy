@@ -2,6 +2,7 @@ use cortexm4;
 use kernel::Chip;
 use kernel::common::{RingBuffer, Queue};
 use nvic;
+use timer;
 
 pub struct MK66 {
     pub mpu: cortexm4::mpu::MPU,
@@ -33,10 +34,16 @@ impl Chip for MK66 {
     type SysTick = cortexm4::systick::SysTick;
 
     fn service_pending_interrupts(&mut self) {
+        use nvic::NvicIdx::*;
+
         unsafe {
             let iq = INTERRUPT_QUEUE.as_mut().unwrap();
             while let Some(interrupt) = iq.dequeue() {
                 match interrupt {
+                    PIT0 => timer::PIT0.handle_interrupt(),
+                    PIT1 => timer::PIT1.handle_interrupt(),
+                    PIT2 => timer::PIT2.handle_interrupt(),
+                    PIT3 => timer::PIT3.handle_interrupt(),
                     _ => {}
                 }
 

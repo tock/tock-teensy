@@ -21,12 +21,28 @@ pub fn blink_test() {
     }
 }
 
-fn led_on() {
+pub fn other_blink_test() {
+    loop {
+        delay();
+        led_toggle();
+    }
+}
+
+pub fn led_on() {
     unsafe {
+        gpio::PC05.reclaim();
         let led = gpio::PC05.make_gpio();
         led.enable_output();
         led.set();
-        loop {}
+    }
+}
+
+pub fn led_off() {
+    unsafe {
+        gpio::PC05.reclaim();
+        let led = gpio::PC05.make_gpio();
+        led.enable_output();
+        led.clear();
     }
 }
 

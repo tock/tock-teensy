@@ -1,7 +1,6 @@
 use common::regs::{RW, RO};
 
 #[repr(C, packed)]
-#[allow(dead_code)]
 pub struct Registers {
     pub bdh: RW<u8>,
     pub bdl: RW<u8>,
@@ -44,7 +43,6 @@ pub struct Registers {
     pub wp7816c_t1: RW<u8>,
 }
 
-#[allow(dead_code)]
 pub const UART_BASE_ADDRS: [*mut Registers; 5] = [0x4006A000 as *mut Registers,
                                                   0x4006B000 as *mut Registers,
                                                   0x4006C000 as *mut Registers,

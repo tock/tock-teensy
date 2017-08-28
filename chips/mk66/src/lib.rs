@@ -12,6 +12,7 @@ extern crate kernel;
 #[macro_use]
 mod helpers;
 
+#[allow(dead_code)]
 mod regs;
 
 #[macro_use]
@@ -26,6 +27,7 @@ pub mod mcg;
 pub mod osc;
 pub mod uart;
 pub mod clock;
+pub mod timer;
 
 // TODO: Should this be moved to the cortexm crate?
 unsafe extern "C" fn unhandled_interrupt() {
@@ -90,11 +92,11 @@ pub static BASE_VECTORS: [unsafe extern fn(); 16] = [
 #[link_section=".vectors"]
 // no_mangle ensures that the symbol is kept until the final binary
 #[no_mangle]
-pub static IRQS: [unsafe extern "C" fn(); 99] = [generic_isr; 99];
+pub static IRQS: [unsafe extern "C" fn(); 100] = [generic_isr; 100];
 
 #[no_mangle]
 #[cfg_attr(rustfmt, rustfmt_skip)]
-pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 99] = [
+pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 100] = [
     /* DMA0 */          Option::Some(unhandled_interrupt),
     /* DMA1 */          Option::Some(unhandled_interrupt),
     /* DMA2 */          Option::Some(unhandled_interrupt),
@@ -111,6 +113,7 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 99] = [
     /* DMA13 */         Option::Some(unhandled_interrupt),
     /* DMA14 */         Option::Some(unhandled_interrupt),
     /* DMA15 */         Option::Some(unhandled_interrupt),
+    /* DMAERR */        Option::Some(unhandled_interrupt),
     /* MCM */           Option::Some(unhandled_interrupt),
     /* FLASHCC */       Option::Some(unhandled_interrupt),
     /* FLASHRC */       Option::Some(unhandled_interrupt),
@@ -142,10 +145,10 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 99] = [
     /* CMT */           Option::Some(unhandled_interrupt),
     /* RTC_ALARM */     Option::Some(unhandled_interrupt),
     /* RTC_SECONDS */   Option::Some(unhandled_interrupt),
-    /* PIT0 */          Option::Some(unhandled_interrupt),
-    /* PIT1 */          Option::Some(unhandled_interrupt),
-    /* PIT2 */          Option::Some(unhandled_interrupt),
-    /* PIT3 */          Option::Some(unhandled_interrupt),
+    /* PIT0 */          Option::Some(timer::timer0_handler),
+    /* PIT1 */          Option::Some(timer::timer1_handler),
+    /* PIT2 */          Option::Some(timer::timer2_handler),
+    /* PIT3 */          Option::Some(timer::timer3_handler),
     /* PDB */           Option::Some(unhandled_interrupt),
     /* USBFS_OTG */     Option::Some(unhandled_interrupt),
     /* USBFS_CHARGE */  Option::Some(unhandled_interrupt),

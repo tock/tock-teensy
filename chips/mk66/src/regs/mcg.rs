@@ -2,7 +2,6 @@ use common::regs::{RW, RO};
 
 pub const MCG: *mut Registers = 0x4006_4000 as *mut Registers;
 
-#[allow(dead_code)]
 #[repr(C, packed)]
 pub struct Registers {
     pub c1: RW<u8>,

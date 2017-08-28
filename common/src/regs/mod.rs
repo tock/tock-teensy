@@ -9,12 +9,27 @@ use core::ops::{BitAnd, BitOr, Not, Shr, Shl, Add};
 pub trait IntLike: BitAnd<Output=Self> +
                    BitOr<Output=Self> +
                    Not<Output=Self> +
+                   Eq +
                    Shr<u32, Output=Self> +
-                   Shl<u32, Output=Self> + Copy + Clone {}
+                   Shl<u32, Output=Self> + Copy + Clone {
+    fn zero() -> Self;
+}
 
-impl IntLike for u8 {}
-impl IntLike for u16 {}
-impl IntLike for u32 {}
+impl IntLike for u8 {
+    fn zero() -> Self {
+        0
+    }
+}
+impl IntLike for u16 {
+    fn zero() -> Self {
+        0
+    }
+}
+impl IntLike for u32 {
+    fn zero() -> Self {
+        0
+    }
+}
 
 pub struct RW<T: IntLike> {
     value: T,
@@ -62,14 +77,12 @@ impl<T: IntLike> RW<T> {
     }
 
     #[inline]
-    pub fn is_set(&self, field: Field<T>) -> bool 
-        where T: PartialEq<u8> {
-        self.read(field) != 0
+    pub fn is_set(&self, field: Field<T>) -> bool {
+        self.read(field) != T::zero()
     }
 
     #[inline]
-    pub fn matches(&self, field: FieldValue<T>) -> bool
-        where T: Eq {
+    pub fn matches(&self, field: FieldValue<T>) -> bool {
         self.get() & field.mask == field.value
     }
 }
@@ -92,14 +105,12 @@ impl<T: IntLike> RO<T> {
     }
 
     #[inline]
-    pub fn is_set(&self, field: Field<T>) -> bool 
-        where T: PartialEq<u8> {
-        self.read(field) != 0
+    pub fn is_set(&self, field: Field<T>) -> bool {
+        self.read(field) != T::zero()
     }
 
     #[inline]
-    pub fn matches(&self, field: FieldValue<T>) -> bool
-        where T: Eq {
+    pub fn matches(&self, field: FieldValue<T>) -> bool {
         self.get() & field.mask == field.value
     }
 }

@@ -36,6 +36,7 @@ pub enum NvicIdx {
     DMA13,
     DMA14,
     DMA15,
+    DMAERR,
     MCM,
     FLASHCC,
     FLASHRC,

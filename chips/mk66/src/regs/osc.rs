@@ -2,7 +2,6 @@ use common::regs::RW;
 
 pub const OSC: *mut Registers = 0x4006_5000 as *mut Registers;
 
-#[allow(dead_code)]
 #[repr(C, packed)]
 pub struct Registers {
     pub cr: RW<u8>,

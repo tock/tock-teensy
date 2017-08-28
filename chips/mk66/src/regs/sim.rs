@@ -1,7 +1,6 @@
 use common::regs::{RW, RO};
 
 #[repr(C, packed)]
-#[allow(dead_code)]
 pub struct Registers {
     pub sopt2: RW<u32>,
     _reserved0: RW<u32>,
