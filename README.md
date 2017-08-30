@@ -3,6 +3,9 @@
 This repository is an experimental port of the Tock embedded operating system to
 the Teensy 3.6.
 
+For this port to work, a standard Tock distribution must be placed in a subdirectory
+tock/.
+
 ## Compiling
 
 To compile the kernel, simply run `make` from the top-level directory. You must
