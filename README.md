@@ -3,8 +3,18 @@
 This repository is an experimental port of the Tock embedded operating system to
 the Teensy 3.6.
 
-For this port to work, a standard Tock distribution must be placed in a subdirectory
-tock/.
+## Installation
+
+This repository depends on the standard Tock distribution as a git submodule 
+in the `tock/` folder. To download this repo, use: 
+
+```
+git clone --recursive https://github.com/shaneleonard/tock-teensy.git
+```
+
+(note the `--recursive` flag, which is needed to download the `tock/` 
+dependency).
+
 
 ## Compiling
 
