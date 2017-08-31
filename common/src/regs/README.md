@@ -107,7 +107,7 @@ regs.cr.set(regs.cr.get() + 1);
 let range: u8 = regs.cr.read(CR::RANGE);
 
 // `en` will be 0 or 1
-let en: u8 = regs.s.read(CR::EN);
+let en: u8 = regs.cr.read(CR::EN);
 
 
 // -----------------------------------------------------------------------------
@@ -177,6 +177,23 @@ Examining the binaries while testing this interface, everything compiles
 down to the optimal inlined bit twiddling instructions--in other words, there is
 zero runtime cost, as far as my informal preliminary study has found. I will
 eventually be writing a more rigorous test to confirm this.
+
+## Gotchas
+
+It's worth noting that bitfields are in no way type-constrained to only work on 
+a particular register. Any bitfield is valid for any `RW`, `RO`, or `WO`.
+While this provides a lot of desirable flexibility (eg. when a set of bitfields 
+applies to a group of registers), it's also something to watch out for:
+
+```rust
+// Both of these operations are valid, even though EN is not a 
+// field in the status register S.
+let s_en  = regs.s.get(CR::EN);
+let cr_en = regs.cr.get(CR::EN);
+```
+
+In this case, the fact that you're accessing `regs.s` should be an indicator 
+that `CR::` is the wrong namespace, and instead you should be using fields under `S::`.
 
 
 ## Usage in Tock Teensy port
