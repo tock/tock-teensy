@@ -43,7 +43,7 @@ pub static FLASH_CONFIG_BYTES: [u8; 16] = [
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
-    use mk66::{wdog, sim, gpio, timer};
+    use mk66::{wdog, sim, gpio, pit};
 
     // Disable the watchdog
     wdog::stop();
@@ -53,7 +53,7 @@ pub unsafe fn reset_handler() {
 
     mk66::init();
 
-    timer::init();
+    pit::PIT.init();
 
     gpio::PB17.set_function(gpio::functions::UART0_TX);
     gpio::PB16.set_function(gpio::functions::UART0_RX);

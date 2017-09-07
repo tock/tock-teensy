@@ -9,11 +9,11 @@ mod registers;
 mod print;
 
 #[allow(dead_code)]
-mod timer;
+mod alarm;
 
 // Set this function to run whatever test you desire. Test functions are named XXX_test by convention.
 pub fn test() {
-    timer::timer_oneshot_test();
+    alarm::alarm_test();
 }
 
 // Set this to true to make the kernel run the test instead of main.

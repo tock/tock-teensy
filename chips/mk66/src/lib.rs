@@ -27,7 +27,7 @@ pub mod mcg;
 pub mod osc;
 pub mod uart;
 pub mod clock;
-pub mod timer;
+pub mod pit;
 
 // TODO: Should this be moved to the cortexm crate?
 unsafe extern "C" fn unhandled_interrupt() {
@@ -145,10 +145,10 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 100] = [
     /* CMT */           Option::Some(unhandled_interrupt),
     /* RTC_ALARM */     Option::Some(unhandled_interrupt),
     /* RTC_SECONDS */   Option::Some(unhandled_interrupt),
-    /* PIT0 */          Option::Some(timer::timer0_handler),
-    /* PIT1 */          Option::Some(timer::timer1_handler),
-    /* PIT2 */          Option::Some(timer::timer2_handler),
-    /* PIT3 */          Option::Some(timer::timer3_handler),
+    /* PIT0 */          Option::Some(unhandled_interrupt),
+    /* PIT1 */          Option::Some(unhandled_interrupt),
+    /* PIT2 */          Option::Some(pit::pit2_handler),
+    /* PIT3 */          Option::Some(unhandled_interrupt),
     /* PDB */           Option::Some(unhandled_interrupt),
     /* USBFS_OTG */     Option::Some(unhandled_interrupt),
     /* USBFS_CHARGE */  Option::Some(unhandled_interrupt),

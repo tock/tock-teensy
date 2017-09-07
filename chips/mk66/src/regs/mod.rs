@@ -3,4 +3,4 @@ pub mod osc;
 pub mod sim;
 pub mod uart;
 pub mod wdog;
-pub mod timer;
+pub mod pit;
