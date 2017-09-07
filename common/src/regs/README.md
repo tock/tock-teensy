@@ -123,15 +123,15 @@ regs.cr.modify(CR::RANGE::VeryHigh);
 // Another example of writing a field with a raw value:
 regs.cr.modify(CR::EN.val(0)); // Leaves RANGE, INT unchanged
 
-// For one-bit fields, the named values True and False are automatically
+// For one-bit fields, the named values SET and CLEAR are automatically
 // defined:
-regs.cr.modify(CR::EN::True);
+regs.cr.modify(CR::EN::SET);
 
 // Write multiple values at once, without altering other fields:
-regs.cr.modify(CR::EN::False + CR::RANGE::Low); // INT unchanged
+regs.cr.modify(CR::EN::CLEAR + CR::RANGE::Low); // INT unchanged
 
 // Any number of non-overlapping fields can be combined:
-regs.cr.modify(CR::EN::False + CR::RANGE::High + CR::INT::True);
+regs.cr.modify(CR::EN::CLEAR + CR::RANGE::High + CR::INT::SET);
 
 
 // -----------------------------------------------------------------------------
@@ -155,13 +155,13 @@ let txcomplete: bool = regs.s.is_set(S::TXCOMPLETE);
 // You can also query a specific register state easily with `matches`:
 
 // Doesn't care about the state of any field except TXCOMPLETE and MODE:
-let ready: bool = regs.s.matches(S::TXCOMPLETE:True + 
+let ready: bool = regs.s.matches(S::TXCOMPLETE:SET + 
                                  S::MODE::FullDuplex);
 
 // This is very useful for awaiting for a specific condition:
-while !regs.s.matches(S::TXCOMPLETE::True + 
-                      S::RXCOMPLETE::True +
-                      S::TXINTERRUPT::False) {}
+while !regs.s.matches(S::TXCOMPLETE::SET + 
+                      S::RXCOMPLETE::SET +
+                      S::TXINTERRUPT::CLEAR) {}
 ```
 
 Note that `modify` performs exactly one volatile load and one volatile store,

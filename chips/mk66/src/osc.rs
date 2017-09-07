@@ -10,5 +10,5 @@ pub fn enable(osc: ::mcg::Xtal) {
     regs.cr.modify(CR::CAP.val(osc.load as u8));
 
     // Enable the oscillator.
-    regs.cr.modify(CR::EREFSTEN::True);
+    regs.cr.modify(CR::EREFSTEN::SET);
 }

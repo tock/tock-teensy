@@ -10,8 +10,8 @@ pub struct Registers {
 
 bitfields![u8,
     CR [
-        ERCLKEN (1, 7) [],
-        EREFSTEN (1, 5) [],
+        ERCLKEN 7 [],
+        EREFSTEN 5 [],
         CAP (0b1111, 0) [
             Load_0pF = 0b0000,
             Load_2pF = 0b1000,

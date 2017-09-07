@@ -42,17 +42,17 @@ impl Uart {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
 
         let (pe, pt) = match parity {
-            hil::uart::Parity::None => (C1::PE::False, C1::PT::Even),
-            hil::uart::Parity::Even => (C1::PE::True, C1::PT::Even),
-            hil::uart::Parity::Odd => (C1::PE::True, C1::PT::Odd)
+            hil::uart::Parity::None => (C1::PE::CLEAR, C1::PT::Even),
+            hil::uart::Parity::Even => (C1::PE::SET, C1::PT::Even),
+            hil::uart::Parity::Odd => (C1::PE::SET, C1::PT::Odd)
         };
 
         // This basic procedure outlined in section 59.9.3.
         // Set control register 1, which configures the parity.
         regs.c1.write(pe + pt +
-                      C1::LOOPS::False +
-                      C1::UARTSWAI::False +
-                      C1::RSRC::False +
+                      C1::LOOPS::CLEAR +
+                      C1::UARTSWAI::CLEAR +
+                      C1::RSRC::CLEAR +
                       C1::M::EightBit +
                       C1::WAKE::Idle +
                       C1::ILT::AfterStart);
@@ -89,12 +89,12 @@ impl Uart {
 
     pub fn enable_rx(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c2.write(C2::RE::True);
+        regs.c2.write(C2::RE::SET);
     }
 
     pub fn enable_tx(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c2.write(C2::TE::True);
+        regs.c2.write(C2::TE::SET);
     }
 
     fn enable_clock(&self) {

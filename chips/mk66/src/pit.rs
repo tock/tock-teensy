@@ -21,17 +21,17 @@ impl<'a> Pit<'a> {
 
     pub fn init(&self) {
         sim::enable_clock(sim::clocks::PIT);
-        self.regs().mcr.write(MCR::MDIS::False +
-                              MCR::FRZ::True);
+        self.regs().mcr.write(MCR::MDIS::CLEAR +
+                              MCR::FRZ::SET);
 
         // Configure the lifetime timer.
         self.pit(0).ldval.set(0xFFFF_FFFF);
         self.pit(1).ldval.set(0xFFFF_FFFF);
-        self.pit(1).tctrl.modify(TCTRL::CHN::True);
+        self.pit(1).tctrl.modify(TCTRL::CHN::SET);
 
         // Enable the lifetime timer.
-        self.pit(1).tctrl.modify(TCTRL::TEN::True);
-        self.pit(0).tctrl.modify(TCTRL::TEN::True);
+        self.pit(1).tctrl.modify(TCTRL::TEN::SET);
+        self.pit(0).tctrl.modify(TCTRL::TEN::SET);
     }
 
     fn regs(&self) -> &mut Registers {
@@ -43,7 +43,7 @@ impl<'a> Pit<'a> {
     }
 
     pub fn enable(&self) {
-        self.pit(2).tctrl.modify(TCTRL::TEN::True);
+        self.pit(2).tctrl.modify(TCTRL::TEN::SET);
     }
 
     pub fn is_enabled(&self) -> bool {
@@ -52,7 +52,7 @@ impl<'a> Pit<'a> {
 
     pub fn enable_interrupt(&self) {
         unsafe { nvic::enable(nvic::NvicIdx::PIT2); }
-        self.pit(2).tctrl.modify(TCTRL::TIE::True);
+        self.pit(2).tctrl.modify(TCTRL::TIE::SET);
     }
 
     pub fn set_counter(&self, value: u32) {
@@ -64,16 +64,16 @@ impl<'a> Pit<'a> {
     }
 
     pub fn clear_pending(&self) {
-        self.pit(2).tflg.modify(TFLG::TIF::True);
+        self.pit(2).tflg.modify(TFLG::TIF::SET);
         unsafe { nvic::clear_pending(nvic::NvicIdx::PIT2); }
     }
 
     pub fn disable(&self) {
-        self.pit(2).tctrl.modify(TCTRL::TEN::False);
+        self.pit(2).tctrl.modify(TCTRL::TEN::CLEAR);
     }
 
     pub fn disable_interrupt(&self) {
-        self.pit(2).tctrl.modify(TCTRL::TIE::False);
+        self.pit(2).tctrl.modify(TCTRL::TIE::CLEAR);
     }
 
     pub fn set_client(&self, client: &'a Client) {

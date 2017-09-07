@@ -37,14 +37,6 @@ macro_rules! bitmasks {
             pub const $valname: FieldValue<$valtype> = FieldValue::<$valtype>::new($mask, $shift, $value);
             )*
 
-            #[allow(non_upper_case_globals)]
-            #[allow(unused)]
-            pub const True: FieldValue<$valtype> = FieldValue::<$valtype>::new($mask, $shift, 1);
-
-            #[allow(non_upper_case_globals)]
-            #[allow(unused)]
-            pub const False: FieldValue<$valtype> = FieldValue::<$valtype>::new($mask, $shift, 0);
-
             #[allow(dead_code)]
             #[allow(non_camel_case_types)]
             pub enum Value {
@@ -77,11 +69,11 @@ macro_rules! bitmasks {
 
             #[allow(non_upper_case_globals)]
             #[allow(unused)]
-            pub const True: FieldValue<$valtype> = FieldValue::<$valtype>::new(1, $bit, 1);
+            pub const SET: FieldValue<$valtype> = FieldValue::<$valtype>::new(1, $bit, 1);
 
             #[allow(non_upper_case_globals)]
             #[allow(unused)]
-            pub const False: FieldValue<$valtype> = FieldValue::<$valtype>::new(1, $bit, 0);
+            pub const CLEAR: FieldValue<$valtype> = FieldValue::<$valtype>::new(1, $bit, 0);
 
             #[allow(dead_code)]
             #[allow(non_camel_case_types)]

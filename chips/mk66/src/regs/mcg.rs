@@ -43,46 +43,46 @@ bitfields![u8,
             Low64_High1280 = 6,
             Low128_High1536 = 7
         ],
-        IREFS (1, 2) [
+        IREFS 2 [
             External = 0,
             SlowInternal = 1
         ],
-        IRCLKEN (1, 1) [
+        IRCLKEN 1 [
             Inactive = 0,
             Active = 1
         ],
-        IREFSTEN (1, 0) [
+        IREFSTEN 0 [
             IrefDisabledInStop = 0,
             IrefEnabledInStop = 1
         ]
     ],
 
     C2 [
-        LOCKRE0 (1, 7) [],
-        FCFTRIM (1, 6) [],
+        LOCKRE0 7 [],
+        FCFTRIM 6 [],
         RANGE (0b11, 4) [
             Low = 0,
             High = 1,
             VeryHigh = 2
         ],
-        HGO (1, 3) [
+        HGO 3 [
             LowPower = 0,
             HighGain = 1
         ],
-        EREFS (1, 2) [
+        EREFS 2 [
             External = 0,
             Oscillator = 1
         ],
-        LP (1, 1) [],
-        IRCS (1, 0) [
+        LP 1 [],
+        IRCS 0 [
             SlowInternal = 0,
             FastInternal = 1
         ]
     ],
 
     C5 [
-        PLLCLKEN (1, 6) [],
-        PLLSTEN (1, 5) [],
+        PLLCLKEN 6 [],
+        PLLSTEN 5 [],
         PRDIV (0b111, 0) [
             Div1 = 0, Div2 = 1, Div3 = 2, Div4 = 3,
             Div5 = 4, Div6 = 5, Div7 = 6, Div8 = 7
@@ -90,12 +90,12 @@ bitfields![u8,
     ],
 
     C6 [
-        LOLIE0 (1, 7) [],
-        PLLS (1, 6) [
+        LOLIE0 7 [],
+        PLLS 6 [
             Fll = 0,
             PllcsOutput = 1
         ],
-        CME0 (1, 5) [],
+        CME0 5 [],
         VDIV (0b11111, 0) [
             Mul16 = 0, Mul17 = 1, Mul18 = 2, Mul19 = 3,
             Mul20 = 4, Mul21 = 5, Mul22 = 6, Mul23 = 7,
@@ -109,13 +109,13 @@ bitfields![u8,
     ],
 
     S [
-        LOLS0 (1, 7) [],
-        LOCK0 (1, 6) [],
-        PLLST (1, 5) [
+        LOLS0 7 [],
+        LOCK0 6 [],
+        PLLST 5 [
             Fll = 0,
             PllcsOutput = 1
         ],
-        IREFST (1, 4) [
+        IREFST 4 [
             External = 0,
             Internal = 1
         ],
@@ -125,8 +125,8 @@ bitfields![u8,
             External = 2,
             Pll = 3
         ],
-        OSCINIT0 (1, 1) [],
-        IRCST (1, 0) [
+        OSCINIT0 1 [],
+        IRCST 0 [
             Slow = 0,
             Fast = 1
         ]

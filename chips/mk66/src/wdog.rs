@@ -30,8 +30,8 @@ pub fn stop() {
 
     // WDOG disabled in all power modes
     // Allow future updates to the watchdog configuration
-    regs.stctrlh.write(STCTRLH::ALLOWUPDATE::True + 
-                       STCTRLH::WDOGEN::False);
+    regs.stctrlh.write(STCTRLH::ALLOWUPDATE::SET + 
+                       STCTRLH::WDOGEN::CLEAR);
 }
 
 pub fn tickle() {

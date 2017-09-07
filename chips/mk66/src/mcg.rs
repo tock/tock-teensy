@@ -80,14 +80,14 @@ impl Fei {
         let mcg: &mut Registers = unsafe { mem::transmute(MCG) };
 
         mcg.c2.modify(C2::RANGE.val(xtal.range as u8) +
-                      C2::EREFS::True);
+                      C2::EREFS::SET);
 
         mcg.c1.write(C1::CLKS::External +
                      C1::FRDIV.val(xtal.frdiv as u8) +
-                     C1::IREFS::False);
+                     C1::IREFS::CLEAR);
 
-        while !mcg.s.matches(S::OSCINIT0::True + 
-                             S::IREFST::False + 
+        while !mcg.s.matches(S::OSCINIT0::SET + 
+                             S::IREFST::CLEAR + 
                              S::CLKST::External) {}
 
         Fbe { }
@@ -108,10 +108,10 @@ impl Fbe {
         mcg.c5.modify(C5::PRDIV.val(divider - 1));
 
         mcg.c6.modify(C6::VDIV.val(multiplier - 16) +
-                      C6::PLLS::True);
+                      C6::PLLS::SET);
 
         // Wait for PLL to be selected and stable PLL lock
-        while !mcg.s.matches(S::PLLST::True + S::LOCK0::True) {}
+        while !mcg.s.matches(S::PLLST::SET + S::LOCK0::SET) {}
 
         Pbe { }
     }
