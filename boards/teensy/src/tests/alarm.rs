@@ -23,7 +23,7 @@ impl Client for LedClient {
             INTERVAL = if UP {INTERVAL + 1_000_000} else { INTERVAL - 1_000_000 };
             LAST_TIME = now;
             pit::PIT.set_alarm(INTERVAL);
-            println!("Interval: {}, Time: {}, Gap: {}, Overhead: {}", INTERVAL, now, gap, wasted);
+            debug!("Interval: {}, Time: {}, Gap: {}, Overhead: {}", INTERVAL, now, gap, wasted);
         }
     }
 }
@@ -31,7 +31,6 @@ impl Client for LedClient {
 static LED: LedClient = LedClient;
 
 pub fn alarm_test() {
-    clock::configure(72);
     assert!(pit::PitFrequency::frequency() == 36_000_000,
             "Timer frequency does not match expected value!");
 

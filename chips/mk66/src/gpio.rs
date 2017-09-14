@@ -564,4 +564,8 @@ pub mod functions {
     // UART0: PB16, PB17
     pub const UART0_RX: Function<PinB16> = Function::new(Alt3);
     pub const UART0_TX: Function<PinB17> = Function::new(Alt3);
+
+    // SPI1
+    pub const SPI1_MOSI: Function<PinD06> = Function::new(Alt7);
+    pub const SPI1_SCK: Function<PinD05> = Function::new(Alt7);
 }

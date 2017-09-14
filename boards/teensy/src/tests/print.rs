@@ -1,9 +1,6 @@
-use mk66::clock;
 use tests::blink;
 
 pub fn print_test() {
-    clock::configure(36);
-
     loop {
         println!("Hello World!");
         blink::delay();
@@ -12,6 +9,13 @@ pub fn print_test() {
 }
 
 pub fn panic_test() {
-    clock::configure(72);
-    panic!("This is a drill.");
+    panic!("This is a kernel panic.");
+}
+
+pub fn debug_test() {
+    loop {
+        debug!("This is a debug message from the kernel.");
+        blink::delay();
+        blink::led_toggle();
+    }
 }

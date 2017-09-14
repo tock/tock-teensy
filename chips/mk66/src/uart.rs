@@ -142,11 +142,15 @@ impl hil::uart::UART for Uart {
         }
 
         while !self.tx_ready() {}
+
+        self.client.get().map(move |client| 
+            client.transmit_complete(tx_data, uart::Error::CommandComplete)
+        );
     }
 
     #[allow(unused_variables)]
     fn receive(&self, rx_buffer: &'static mut [u8], rx_len: usize) {
-        // TODO: implement
+        unimplemented!();
     }
 }
 

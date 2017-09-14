@@ -18,7 +18,7 @@ fn unlock() {
 
 #[allow(unused_variables)]
 pub fn start(period: usize) {
-    // TODO: implement
+    unimplemented!();
 }
 
 pub fn stop() {
@@ -28,10 +28,13 @@ pub fn stop() {
     // the module.
     unlock();
 
-    // WDOG disabled in all power modes
-    // Allow future updates to the watchdog configuration
-    regs.stctrlh.write(STCTRLH::ALLOWUPDATE::SET + 
-                       STCTRLH::WDOGEN::CLEAR);
+    // WDOG disabled in all power modes.
+    // Allow future updates to the watchdog configuration.
+    regs.stctrlh.modify(STCTRLH::ALLOWUPDATE::SET + 
+                        STCTRLH::WAITEN::CLEAR +
+                        STCTRLH::STOPEN::CLEAR +
+                        STCTRLH::DBGEN::CLEAR +
+                        STCTRLH::WDOGEN::CLEAR);
 }
 
 pub fn tickle() {

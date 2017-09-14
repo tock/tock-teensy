@@ -4,6 +4,8 @@
 
 extern crate capsules;
 extern crate compiler_builtins;
+
+#[macro_use(debug, static_init)]
 extern crate kernel;
 
 #[macro_use]
@@ -18,9 +20,19 @@ pub mod io;
 #[allow(dead_code)]
 mod tests;
 
+use capsules::timer::TimerDriver;
+use capsules::spi::Spi;
+use capsules::console::Console;
+use capsules::virtual_spi::{VirtualSpiMasterDevice, MuxSpiMaster};
+use kernel::hil::spi::SpiMaster;
+use kernel::hil::uart::UART;
+
 
 #[allow(unused)]
 struct Teensy {
+    console: &'static Console<'static, mk66::uart::Uart>,
+    timer: &'static TimerDriver<'static, mk66::pit::Pit<'static>>,
+    spi: &'static Spi<'static, VirtualSpiMasterDevice<'static, mk66::spi::Spi<'static>>>,
     ipc: kernel::ipc::IPC,
 }
 
@@ -29,6 +41,15 @@ impl kernel::Platform for Teensy {
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
         match driver_num {
+            0 => f(Some(self.console)),
+            // // 1 => f(Some(self.gpio)),
+
+            3 => f(Some(self.timer)),
+            4 => f(Some(self.spi)),
+
+            // 8 => f(Some(self.led)),
+
+            0xff => f(Some(&self.ipc)),
             _ => f(None),
         }
     }
@@ -41,24 +62,84 @@ pub static FLASH_CONFIG_BYTES: [u8; 16] = [
     0xFF, 0xFF, 0xFF, 0xFF, 0xDE, 0xF9, 0xFF, 0xFF,
 ];
 
+pub unsafe fn set_pin_primary_functions() {
+    use mk66::gpio::*;
+    PB17.set_function(functions::UART0_TX);
+    PB16.set_function(functions::UART0_RX);
+
+    PD05.set_function(functions::SPI1_SCK);
+    PD06.set_function(functions::SPI1_MOSI);
+}
+
 #[no_mangle]
 pub unsafe fn reset_handler() {
-    use mk66::{wdog, sim, gpio, pit};
+    use mk66::{clock, wdog, sim, pit, spi, uart};
 
-    // Disable the watchdog
+    // Disable the watchdog.
     wdog::stop();
 
-    // Enable the Port Control and Interrupt clocks
-    sim::enable_clock(sim::clocks::PORTABCDE);
-
+    // Relocate the text and data segments.
     mk66::init();
 
-    pit::PIT.init();
+    // Configure the system clock.
+    clock::configure(120);
 
-    gpio::PB17.set_function(gpio::functions::UART0_TX);
-    gpio::PB16.set_function(gpio::functions::UART0_RX);
+    // Enable the Port Control and Interrupt clocks.
+    sim::enable_clock(sim::clocks::PORTABCDE);
+
+    pit::PIT.init();
+    spi::SPI1.init();
+
+    set_pin_primary_functions();
+
+    let console = static_init!(
+            Console<uart::Uart>,
+            Console::new(&uart::UART0,
+                         115200,
+                         &mut capsules::console::WRITE_BUF,
+                         kernel::Container::create())
+        );
+    uart::UART0.set_client(console);
+    console.initialize();
+
+    let kc = static_init!(
+            capsules::console::App,
+            capsules::console::App::default()
+        );
+    kernel::debug::assign_console_driver(Some(console), kc);
+
+    let timer = static_init!(
+            TimerDriver<'static, mk66::pit::Pit>,
+            TimerDriver::new(&pit::PIT,
+                             kernel::Container::create())
+        );
+
+    let mux_spi = static_init!(
+            MuxSpiMaster<'static, spi::Spi<'static>>,
+            MuxSpiMaster::new(&spi::SPI1)
+        );
+
+    spi::SPI1.set_client(mux_spi);
+
+    let virtual_spi = static_init!(
+            VirtualSpiMasterDevice<'static, spi::Spi<'static>>,
+            VirtualSpiMasterDevice::new(mux_spi, 0)
+        );
+
+    let spi = static_init!(
+            capsules::spi::Spi<'static, VirtualSpiMasterDevice<'static, spi::Spi<'static>>>,
+            capsules::spi::Spi::new(virtual_spi)
+        );
+
+    static mut SPI_READ_BUF: [u8; 64] = [0; 64];
+    static mut SPI_WRITE_BUF: [u8; 64] = [0; 64];
+    spi.config_buffers(&mut SPI_READ_BUF, &mut SPI_WRITE_BUF);
+    virtual_spi.set_client(spi);
 
     let teensy = Teensy {
+        console: console,
+        timer: timer,
+        spi: spi,
         ipc: kernel::ipc::IPC::new(),
     };
 
@@ -67,7 +148,7 @@ pub unsafe fn reset_handler() {
     if tests::TEST {
         tests::test();
     }
-   
+
     kernel::main(&teensy, &mut chip, load_processes(), &teensy.ipc);
 }
 

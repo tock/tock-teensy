@@ -56,7 +56,5 @@ pub fn led_toggle() {
 }
 
 pub fn fast_blink_test() {
-    clock::configure(120);
-
     blink_test();
 }
