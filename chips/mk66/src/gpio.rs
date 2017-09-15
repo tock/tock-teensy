@@ -145,7 +145,7 @@ impl<'a, P: PinNum> Pin<'a, P> {
     const fn new(port: &'a Port<'a>) -> Pin<'a, P> {
         Pin {
             gpio: Gpio {
-                pin: P::PIN % 32,
+                pin: P::PIN,
                 port: port,
                 valid: ATOMIC_BOOL_INIT
             },
@@ -156,7 +156,14 @@ impl<'a, P: PinNum> Pin<'a, P> {
     pub fn claim_as_gpio(&self) -> &Gpio<'a> {
         let already_allocated = self.gpio.valid.swap(true, Ordering::Relaxed);
         if already_allocated {
-            panic!("Requested GPIO pin {} is already allocated.", self.gpio.pin);
+            let port_name = match self.gpio.pin {
+                0...31 => "A",
+                32...63 => "B",
+                64...95 => "C",
+                96...127 => "D",
+                _ => "E"
+            };
+            panic!("Requested GPIO pin P{}{} is already allocated.", port_name, self.gpio.index());
         }
 
         self.set_peripheral_function(PeripheralFunction::Alt1);
@@ -174,12 +181,12 @@ impl<'a, P: PinNum> Pin<'a, P> {
     }
 
     fn set_peripheral_function(&self, function: PeripheralFunction) {
-        let port: &mut PortRegisters = self.gpio.port.regs();
+        let port = self.gpio.port.regs();
 
         const MUX_MASK: u32 = 0b111 << 8;
-        let cr: u32 = port.cr[self.gpio.pin].get() & !MUX_MASK;
+        let cr: u32 = port.cr[self.gpio.index()].get() & !MUX_MASK;
 
-        port.cr[self.gpio.pin].set(cr | ((function as u32) << 8));
+        port.cr[self.gpio.index()].set(cr | ((function as u32) << 8));
     }
 
     pub fn release_claim(&self) {
@@ -196,28 +203,32 @@ impl<'a> Gpio<'a> {
         unsafe { mem::transmute(self.port.bitband) }
     }
 
+    fn index(&self) -> usize {
+        (self.pin % 32) as usize
+    }
+
     pub fn disable_output(&self) {
-        self.regs().direction[self.pin].set(0);
+        self.regs().direction[self.index()].set(0);
     }
 
     pub fn enable_output(&self) {
-        self.regs().direction[self.pin].set(1);
+        self.regs().direction[self.index()].set(1);
     }
 
     pub fn read(&self) -> bool {
-        self.regs().input[self.pin].get() > 0
+        self.regs().input[self.index()].get() > 0
     }
 
     pub fn toggle(&self) {
-        self.regs().toggle[self.pin].set(1);
+        self.regs().toggle[self.index()].set(1);
     }
 
     pub fn set(&self) {
-        self.regs().set[self.pin].set(1);
+        self.regs().set[self.index()].set(1);
     }
 
     pub fn clear(&self) {
-        self.regs().clear[self.pin].set(1);
+        self.regs().clear[self.index()].set(1);
     }
 
     pub fn set_input_mode(&self, mode: hil::gpio::InputMode) {
@@ -228,9 +239,9 @@ impl<'a> Gpio<'a> {
         };
 
         const MODE_MASK: u32 = 0b11;
-        let cr: u32 = self.port.regs().cr[self.pin].get() & !MODE_MASK;
+        let cr: u32 = self.port.regs().cr[self.index()].get() & !MODE_MASK;
 
-        self.port.regs().cr[self.pin].set(cr | ((mode_bits & MODE_MASK)));
+        self.port.regs().cr[self.index()].set(cr | ((mode_bits & MODE_MASK)));
     }
 
     pub fn set_interrupt_mode(&self, _mode: hil::gpio::InterruptMode) {
@@ -242,7 +253,7 @@ impl<'a> Gpio<'a> {
             return;
         }
 
-        self.port.clients[self.pin].set(None);
+        self.port.clients[self.index()].set(None);
     }
 
     pub fn set_client<C: hil::gpio::Client>(&self, client: &'static C) {
@@ -250,7 +261,7 @@ impl<'a> Gpio<'a> {
             return;
         }
 
-        self.port.clients[self.pin].set(Some(client));
+        self.port.clients[self.index()].set(Some(client));
     }
 
     pub fn set_client_data(&self, data: usize) {
@@ -258,7 +269,7 @@ impl<'a> Gpio<'a> {
             return;
         }
 
-        self.port.client_data[self.pin].set(data);
+        self.port.client_data[self.index()].set(data);
     }
 }
 

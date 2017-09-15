@@ -23,6 +23,8 @@ mod tests;
 use capsules::timer::TimerDriver;
 use capsules::spi::Spi;
 use capsules::console::Console;
+use capsules::gpio::GPIO;
+use capsules::led::{ActivationMode, LED};
 use capsules::virtual_spi::{VirtualSpiMasterDevice, MuxSpiMaster};
 use kernel::hil::spi::SpiMaster;
 use kernel::hil::uart::UART;
@@ -31,6 +33,8 @@ use kernel::hil::uart::UART;
 #[allow(unused)]
 struct Teensy {
     console: &'static Console<'static, mk66::uart::Uart>,
+    gpio: &'static GPIO<'static, mk66::gpio::Gpio<'static>>,
+    led: &'static LED<'static, mk66::gpio::Gpio<'static>>,
     timer: &'static TimerDriver<'static, mk66::pit::Pit<'static>>,
     spi: &'static Spi<'static, VirtualSpiMasterDevice<'static, mk66::spi::Spi<'static>>>,
     ipc: kernel::ipc::IPC,
@@ -42,12 +46,12 @@ impl kernel::Platform for Teensy {
     {
         match driver_num {
             0 => f(Some(self.console)),
-            // // 1 => f(Some(self.gpio)),
+            1 => f(Some(self.gpio)),
 
             3 => f(Some(self.timer)),
             4 => f(Some(self.spi)),
 
-            // 8 => f(Some(self.led)),
+            8 => f(Some(self.led)),
 
             0xff => f(Some(&self.ipc)),
             _ => f(None),
@@ -75,6 +79,7 @@ pub unsafe fn set_pin_primary_functions() {
 #[no_mangle]
 pub unsafe fn reset_handler() {
     use mk66::{clock, wdog, sim, pit, spi, uart};
+    use mk66::gpio::*;
 
     // Disable the watchdog.
     wdog::stop();
@@ -137,8 +142,43 @@ pub unsafe fn reset_handler() {
     spi.config_buffers(&mut SPI_READ_BUF, &mut SPI_WRITE_BUF);
     virtual_spi.set_client(spi);
 
+    let gpio_pins = static_init!(
+        [&'static Gpio; 8],
+        [PD01.claim_as_gpio(),
+         PC00.claim_as_gpio(),
+         PB00.claim_as_gpio(),
+         PB01.claim_as_gpio(),
+         PB03.claim_as_gpio(),
+         PB02.claim_as_gpio(),
+         // PD05.claim_as_gpio(),
+         // PD06.claim_as_gpio(),
+         PC01.claim_as_gpio(),
+         PC02.claim_as_gpio()]
+        );
+
+    let gpio = static_init!(
+        GPIO<'static, Gpio>,
+        GPIO::new(gpio_pins)
+        );
+
+    for pin in gpio_pins.iter() {
+        pin.set_client(gpio);
+    }
+
+    let led_pins = static_init!(
+        [(&'static Gpio, ActivationMode); 1],
+        [(PC05.claim_as_gpio(), ActivationMode::ActiveHigh)]
+        );
+
+    let led = static_init!(
+        LED<'static, Gpio>,
+        LED::new(led_pins)
+        );
+
     let teensy = Teensy {
         console: console,
+        gpio: gpio,
+        led: led,
         timer: timer,
         spi: spi,
         ipc: kernel::ipc::IPC::new(),
