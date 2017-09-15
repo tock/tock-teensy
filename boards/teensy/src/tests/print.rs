@@ -1,11 +1,10 @@
-use tests::blink;
+use tests::{blink, alarm};
 
 pub fn print_test() {
-    loop {
-        println!("Hello World!");
-        blink::delay();
-        blink::led_toggle();
-    }
+    alarm::loop_500ms(|| {
+        println!("Hello World!"); 
+        blink::led_toggle(); 
+    });
 }
 
 pub fn panic_test() {
@@ -13,9 +12,8 @@ pub fn panic_test() {
 }
 
 pub fn debug_test() {
-    loop {
-        debug!("This is a debug message from the kernel.");
-        blink::delay();
-        blink::led_toggle();
-    }
+    alarm::loop_500ms(|| {
+        debug!("This is a kernel debug message."); 
+        blink::led_toggle(); 
+    });
 }

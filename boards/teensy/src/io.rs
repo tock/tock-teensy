@@ -59,8 +59,8 @@ pub unsafe extern "C" fn panic_fmt(args: Arguments, file: &'static str, line: u3
     }
 
     // blink the panic signal
-    gpio::PC05.reclaim();
-    let led = gpio::PC05.make_gpio(); 
+    gpio::PC05.release_claim();
+    let led = gpio::PC05.claim_as_gpio(); 
     led.enable_output();
     loop {
         for _ in 0..1000000 {

@@ -63,12 +63,13 @@ pub static FLASH_CONFIG_BYTES: [u8; 16] = [
 ];
 
 pub unsafe fn set_pin_primary_functions() {
+    use mk66::gpio::functions::*;
     use mk66::gpio::*;
-    PB17.set_function(functions::UART0_TX);
-    PB16.set_function(functions::UART0_RX);
+    PB17.claim_as(UART0_TX);
+    PB16.claim_as(UART0_RX);
 
-    PD05.set_function(functions::SPI1_SCK);
-    PD06.set_function(functions::SPI1_MOSI);
+    PD05.claim_as(SPI1_SCK);
+    PD06.claim_as(SPI1_MOSI);
 }
 
 #[no_mangle]
