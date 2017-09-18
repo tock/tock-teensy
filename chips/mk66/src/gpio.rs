@@ -7,33 +7,62 @@ use core::cell::Cell;
 use core::sync::atomic::Ordering;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT};
-use kernel::common::VolatileCell;
+use common::regs::{RW, WO};
 use core::mem;
 use kernel::hil;
+use nvic::{self, NvicIdx};
 
 // Register map for a single Port Control and Interrupt module
 // [^1]: Section 12.5
 #[repr(C, packed)]
 pub struct PortRegisters {
-    cr: [VolatileCell<u32>; 32],
-    gpclr: VolatileCell<u32>,
-    gpchr: VolatileCell<u32>,
-    isfr: VolatileCell<u32>,
-    dfer: VolatileCell<u32>,
-    dfcr: VolatileCell<u32>,
-    dfwr: VolatileCell<u32>,
+    pcr: [RW<u32>; 32],
+    gpclr: WO<u32>,
+    gpchr: WO<u32>,
+    isfr: RW<u32>,
+    dfer: RW<u32>,
+    dfcr: RW<u32>,
+    dfwr: RW<u32>,
 }
+
+bitfields! [ u32,
+    PCR [
+        ISF 24 [],
+        IRQC (0b1111, 16) [
+            InterruptDisabled = 0,
+            DmaRisingEdge = 1,
+            DmaFallingEdge = 2,
+            DmaEitherEdge = 3,
+            InterruptLogicLow = 8,
+            InterruptRisingEdge = 9,
+            InterruptFallingEdge = 10,
+            InterruptEitherEdge = 11,
+            InterruptLogicHigh = 12
+        ],
+        LK 15 [],
+        MUX (0b111, 8) [],
+        DSE 6 [],
+        ODE 5 [],
+        PFE 4 [],
+        SRE 2 [],
+        PE 1 [],
+        PS 0 [
+            PullDown = 0,
+            PullUp = 1
+        ]
+    ] 
+];
 
 // Register map for a single GPIO port--aliased to bitband region
 // [^1]: Section 63.3.1
 #[repr(C, packed)]
 pub struct GpioBitbandRegisters {
-    output: [VolatileCell<u32>; 32],
-    set: [VolatileCell<u32>; 32],
-    clear: [VolatileCell<u32>; 32],
-    toggle: [VolatileCell<u32>; 32],
-    input: [VolatileCell<u32>; 32],
-    direction: [VolatileCell<u32>; 32],
+    output: [RW<u32>; 32],
+    set: [RW<u32>; 32],
+    clear: [RW<u32>; 32],
+    toggle: [RW<u32>; 32],
+    input: [RW<u32>; 32],
+    direction: [RW<u32>; 32],
 }
 
 pub trait PinNum {
@@ -183,10 +212,7 @@ impl<'a, P: PinNum> Pin<'a, P> {
     fn set_peripheral_function(&self, function: PeripheralFunction) {
         let port = self.gpio.port.regs();
 
-        const MUX_MASK: u32 = 0b111 << 8;
-        let cr: u32 = port.cr[self.gpio.index()].get() & !MUX_MASK;
-
-        port.cr[self.gpio.index()].set(cr | ((function as u32) << 8));
+        port.pcr[self.gpio.index()].modify(PCR::MUX.val(function as u32));
     }
 
     pub fn release_claim(&self) {
@@ -232,20 +258,44 @@ impl<'a> Gpio<'a> {
     }
 
     pub fn set_input_mode(&self, mode: hil::gpio::InputMode) {
-        let mode_bits = match mode {
-            hil::gpio::InputMode::PullUp => 0b11,
-            hil::gpio::InputMode::PullDown => 0b10,
-            hil::gpio::InputMode::PullNone => 0b00,
+        let config = match mode {
+            hil::gpio::InputMode::PullUp => PCR::PE::SET + PCR::PS::PullUp,
+            hil::gpio::InputMode::PullDown => PCR::PE::SET + PCR::PS::PullDown,
+            hil::gpio::InputMode::PullNone => PCR::PE::CLEAR,
         };
 
-        const MODE_MASK: u32 = 0b11;
-        let cr: u32 = self.port.regs().cr[self.index()].get() & !MODE_MASK;
-
-        self.port.regs().cr[self.index()].set(cr | ((mode_bits & MODE_MASK)));
+        self.port.regs().pcr[self.index()].modify(config);
     }
 
-    pub fn set_interrupt_mode(&self, _mode: hil::gpio::InterruptMode) {
-        unimplemented!();
+    pub fn set_interrupt_mode(&self, mode: hil::gpio::InterruptMode) {
+        let config = match mode {
+            hil::gpio::InterruptMode::RisingEdge => PCR::IRQC::InterruptRisingEdge,
+            hil::gpio::InterruptMode::FallingEdge => PCR::IRQC::InterruptFallingEdge,
+            hil::gpio::InterruptMode::EitherEdge => PCR::IRQC::InterruptEitherEdge
+        };
+
+        self.port.regs().pcr[self.index()].modify(config);
+    }
+
+    fn clear_interrupt_status_flag(&self) {
+        self.port.regs().pcr[self.index()].modify(PCR::ISF::SET);
+    }
+
+    fn enable_interrupt(&self) {
+        unsafe {
+            match self.pin {
+                0...31 => nvic::enable(NvicIdx::PCMA),
+                32...63 => nvic::enable(NvicIdx::PCMB),
+                64...95 => nvic::enable(NvicIdx::PCMC),
+                96...127 => nvic::enable(NvicIdx::PCMD),
+                _ => nvic::enable(NvicIdx::PCME)
+            };
+        }
+    }
+
+    fn disable_interrupt(&self) {
+        self.clear_interrupt_status_flag();
+        self.port.regs().pcr[self.index()].modify(PCR::IRQC::InterruptDisabled);
     }
 
     pub fn clear_client(&self) {
@@ -325,12 +375,14 @@ impl<'a> hil::gpio::Pin for Gpio<'a> {
         self.clear();
     }
 
-    fn enable_interrupt(&self, _client_data: usize, _mode: hil::gpio::InterruptMode) {
-        unimplemented!();
+    fn enable_interrupt(&self, client_data: usize, mode: hil::gpio::InterruptMode) {
+        Gpio::enable_interrupt(self);
+        self.set_interrupt_mode(mode);
+        self.set_client_data(client_data);
     }
 
     fn disable_interrupt(&self) {
-        unimplemented!();
+        Gpio::disable_interrupt(self);
     }
 }
 
