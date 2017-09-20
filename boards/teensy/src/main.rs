@@ -119,6 +119,7 @@ pub unsafe fn reset_handler() {
             TimerDriver::new(&pit::PIT,
                              kernel::Container::create())
         );
+    pit::PIT.set_client(timer);
 
     let mux_spi = static_init!(
             MuxSpiMaster<'static, spi::Spi<'static>>,
@@ -137,8 +138,8 @@ pub unsafe fn reset_handler() {
             capsules::spi::Spi::new(virtual_spi)
         );
 
-    static mut SPI_READ_BUF: [u8; 64] = [0; 64];
-    static mut SPI_WRITE_BUF: [u8; 64] = [0; 64];
+    static mut SPI_READ_BUF: [u8; 1024] = [0; 1024];
+    static mut SPI_WRITE_BUF: [u8; 1024] = [0; 1024];
     spi.config_buffers(&mut SPI_READ_BUF, &mut SPI_WRITE_BUF);
     virtual_spi.set_client(spi);
 

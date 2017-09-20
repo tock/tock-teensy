@@ -9,13 +9,15 @@ use sim;
 pub static mut PIT: Pit<'static> = Pit::new();
 
 pub struct Pit<'a> {
-    pub client: Cell<Option<&'a Client>>
+    pub client: Cell<Option<&'a Client>>,
+    alarm: Cell<u32>
 }
 
 impl<'a> Pit<'a> {
     pub const fn new() -> Self {
         Pit {
-            client: Cell::new(None)
+            client: Cell::new(None),
+            alarm: Cell::new(0)
         }
     }
 
@@ -116,13 +118,14 @@ impl<'a> Alarm for Pit<'a> {
 
     fn set_alarm(&self, ticks: u32) {
         Time::disable(self);
-        self.set_counter(ticks);
+        self.alarm.set(ticks.wrapping_sub(self.now()));
+        self.set_counter(self.alarm.get());
         self.enable_interrupt();
         self.enable();
     }
 
     fn get_alarm(&self) -> u32 {
-        self.get_counter()
+        self.alarm.get()
     }
 }
 

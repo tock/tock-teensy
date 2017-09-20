@@ -2,3 +2,4 @@
 .vimrc
 target/
 .DS_Store
+build/

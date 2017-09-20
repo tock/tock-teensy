@@ -1,12 +1,12 @@
-use cortexm4;
 use kernel::Chip;
 use kernel::common::{RingBuffer, Queue};
 use nvic;
 use pit;
+use spi;
 
 pub struct MK66 {
-    pub mpu: cortexm4::mpu::MPU,
-    pub systick: &'static cortexm4::systick::SysTick,
+    pub mpu: (),
+    pub systick: (),
 }
 
 // Interrupt queue allocation
@@ -23,15 +23,15 @@ impl MK66 {
         // TODO: implement
 
         MK66 {
-            mpu: cortexm4::mpu::MPU::new(),
-            systick: cortexm4::systick::SysTick::new(),
+            mpu: (),
+            systick: ()
         }
     }
 }
 
 impl Chip for MK66 {
-    type MPU = cortexm4::mpu::MPU;
-    type SysTick = cortexm4::systick::SysTick;
+    type MPU = ();
+    type SysTick = ();
 
     fn service_pending_interrupts(&mut self) {
         use nvic::NvicIdx::*;
@@ -41,6 +41,9 @@ impl Chip for MK66 {
             while let Some(interrupt) = iq.dequeue() {
                 match interrupt {
                     PIT2 => pit::PIT.handle_interrupt(),
+                    SPI0 => spi::SPI0.handle_interrupt(),
+                    SPI1 => spi::SPI1.handle_interrupt(),
+                    SPI2 => spi::SPI2.handle_interrupt(),
                     _ => {}
                 }
 

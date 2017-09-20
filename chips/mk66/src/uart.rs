@@ -132,12 +132,9 @@ impl hil::uart::UART for Uart {
         self.enable_tx();
     }
 
-    #[allow(unused_variables)]
     fn transmit(&self, tx_data: &'static mut [u8], tx_len: usize) {
-        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-
         // This basic procedure outlined in section 59.9.3.
-        for i in 0..tx_data.len() {
+        for i in 0..tx_len {
             self.send_byte(tx_data[i]);
         }
 

@@ -20,4 +20,4 @@ pub fn test() {
 }
 
 // Set this to true to make the kernel run the test instead of main.
-pub const TEST: bool = true;
+pub const TEST: bool = false;

@@ -20,7 +20,10 @@ debug: boards/$(TOCK_BOARD)/
 	$(MAKE) debug -C $<
 
 program: boards/$(TOCK_BOARD)/
-	$(MAKE) program -C $<
+	$(MAKE) program -C $< TOCK_ARCH=$(TOCK_ARCH)
+
+app: boards/$(TOCK_BOARD)/
+	$(MAKE) app -C $< TOCK_ARCH=$(TOCK_ARCH)
 
 flash: boards/$(TOCK_BOARD)/
 	$(MAKE) flash -C $<

@@ -33,4 +33,4 @@ RAM_LENGTH  = 192K;
  *
  * TODO: verify this number
  */
-MPU_MIN_ALIGN = 32;
+MPU_MIN_ALIGN = 8K;

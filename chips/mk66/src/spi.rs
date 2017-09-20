@@ -1,10 +1,12 @@
 use regs::spi::*;
 use kernel::hil::spi::*;
 use kernel::ReturnCode;
+use kernel::common::take_cell::TakeCell;
 use core::cell::Cell;
 use core::mem;
 use sim;
 use clock;
+use nvic::{self, NvicIdx};
 
 pub enum SpiRole {
     Master,
@@ -15,7 +17,10 @@ pub struct Spi<'a> {
     regs: *mut Registers,
     client: Cell<Option<&'a SpiMasterClient>>,
     index: usize,
-    chip_select_settings: [Cell<u32>; 6]
+    chip_select_settings: [Cell<u32>; 6],
+    write: TakeCell<'static, [u8]>,
+    read: TakeCell<'static, [u8]>,
+    transfer_len: Cell<usize>,
 }
 
 pub static mut SPI0: Spi<'static> = Spi::new(0);
@@ -33,7 +38,10 @@ impl<'a> Spi<'a> {
                                    Cell::new(0),
                                    Cell::new(0),
                                    Cell::new(0),
-                                   Cell::new(0)]
+                                   Cell::new(0)],
+            write: TakeCell::empty(),
+            read: TakeCell::empty(),
+            transfer_len: Cell::new(0),
         }
     }
 
@@ -42,15 +50,20 @@ impl<'a> Spi<'a> {
     }
 
     pub fn enable(&self) {
-        self.regs().mcr.modify(MCR::MDIS::CLEAR + MCR::HALT::CLEAR);
+        self.regs().mcr.modify(MCR::MDIS::CLEAR);
     }
 
     pub fn disable(&self) {
         self.regs().mcr.modify(MCR::MDIS::SET);
     }
 
+    pub fn is_running(&self) -> bool {
+        self.regs().sr.is_set(SR::TXRS)
+    }
+
     pub fn halt(&self) {
         self.regs().mcr.modify(MCR::HALT::SET);
+        while self.is_running() {}
     }
 
     pub fn resume(&self) {
@@ -66,6 +79,7 @@ impl<'a> Spi<'a> {
     }
 
     fn set_role(&self, role: SpiRole) {
+        self.halt();
         match role {
             SpiRole::Master => {
                 self.regs().mcr.modify(MCR::MSTR::Master);
@@ -74,6 +88,7 @@ impl<'a> Spi<'a> {
                 self.regs().mcr.modify(MCR::MSTR::Slave);
             }
         }
+        self.resume();
     }
 
     fn set_polarity(&self, polarity: ClockPolarity) {
@@ -81,7 +96,9 @@ impl<'a> Spi<'a> {
             ClockPolarity::IdleHigh => CTAR::CPOL::IdleHigh,
             ClockPolarity::IdleLow => CTAR::CPOL::IdleLow
         };
+        self.halt();
         self.regs().ctar0.modify(cpol);
+        self.resume();
     }
 
     fn get_polarity(&self) -> ClockPolarity {
@@ -97,7 +114,9 @@ impl<'a> Spi<'a> {
             ClockPhase::SampleLeading => CTAR::CPHA::SampleLeading,
             ClockPhase::SampleTrailing => CTAR::CPHA::SampleTrailing
         };
+        self.halt();
         self.regs().ctar0.modify(cpha);
+        self.resume();
     }
 
     fn get_phase(&self) -> ClockPhase {
@@ -113,7 +132,9 @@ impl<'a> Spi<'a> {
             DataOrder::LSBFirst => CTAR::LSBFE::LsbFirst,
             DataOrder::MSBFirst => CTAR::LSBFE::MsbFirst
         };
+        self.halt();
         self.regs().ctar0.modify(order);
+        self.resume();
     }
 
     pub fn get_data_order(&self) -> DataOrder {
@@ -128,7 +149,8 @@ impl<'a> Spi<'a> {
         // SPI0 has a FIFO with 4 entries, all others have a 1 entry "FIFO".
         match self.index {
             0 => 4,
-            _ => 1
+            1 | 2 => 1,
+            _ => unreachable!()
         }
     }
 
@@ -137,16 +159,20 @@ impl<'a> Spi<'a> {
             0 => 6,
             1 => 4,
             2 => 2,
-            _ => 0
+            _ => unreachable!()
         }
     }
 
     fn flush_tx_fifo(&self) {
+        self.halt();
         self.regs().mcr.modify(MCR::CLR_TXF::SET);
+        self.resume();
     }
 
     fn flush_rx_fifo(&self) {
+        self.halt();
         self.regs().mcr.modify(MCR::CLR_RXF::SET);
+        self.resume();
     }
 
     fn tx_fifo_ready(&self) -> bool {
@@ -198,9 +224,11 @@ impl<'a> Spi<'a> {
             }
         }
 
+        self.halt();
         self.regs().ctar0.modify(CTAR::DBR.val(dbl as u32) +
                                  CTAR::PBR.val(prescaler as u32) +
                                  CTAR::BR.val(scaler as u32));
+        self.resume();
 
         Spi::baud_rate(dbls[dbl], prescalers[prescaler], scalers[scaler])
     }
@@ -230,14 +258,6 @@ impl<'a> Spi<'a> {
         self.regs().sr.read(SR::TXCTR)
     }
 
-    fn clear_transfer_count(&self) {
-        self.regs().pushr_cmd.modify(PUSHR_CMD::CTCNT::SET);
-    }
-
-    fn resume_transfer_count(&self) {
-        self.regs().pushr_cmd.modify(PUSHR_CMD::CTCNT::CLEAR);
-    }
-
     pub fn start_of_queue(&self) {
         self.regs().pushr_cmd.modify(PUSHR_CMD::EOQ::CLEAR);
     }
@@ -249,7 +269,41 @@ impl<'a> Spi<'a> {
     fn set_frame_size(&self, size: u32) {
         if size > 16 || size < 4 { return }
 
+        self.halt();
         self.regs().ctar0.modify(CTAR::FMSZ.val(size - 1));
+        self.resume();
+    }
+
+    fn enable_interrupt(&self) {
+        let idx = match self.index {
+            0 => NvicIdx::SPI0,
+            1 => NvicIdx::SPI1,
+            2 => NvicIdx::SPI2,
+            _ => unreachable!()
+        };
+
+        self.halt();
+        unsafe {
+            nvic::enable(idx);
+        }
+        self.regs().rser.modify(RSER::EOQF_RE::SET);
+        self.resume();
+    }
+
+    pub fn handle_interrupt(&self) {
+        // TODO: Determine why the extra interrupt is called
+
+        // End of transfer
+        if self.regs().sr.is_set(SR::EOQF) {
+            self.regs().sr.modify(SR::EOQF::SET);
+
+            self.client.get().map(|client| {
+                match self.write.take() {
+                    Some(wbuf) => client.read_write_done(wbuf, self.read.take(), self.transfer_len.get()),
+                    None => ()
+                };
+            });
+        }
     }
 }
 
@@ -263,18 +317,19 @@ impl<'a> SpiMaster for Spi<'a> {
     fn init(&self) {
         // Section 57.6.2
         self.enable_clock();
-        self.halt();
         self.flush_rx_fifo();
         self.flush_tx_fifo();
         self.set_role(SpiRole::Master);
+        self.enable_interrupt();
         self.enable();
 
         self.set_frame_size(8);
         self.regs().mcr.modify(MCR::PCSIS::AllInactiveHigh);
+        self.regs().pushr_cmd.modify(PUSHR_CMD::PCS.val(0));
     }
 
     fn is_busy(&self) -> bool {
-        !self.regs().sr.is_set(SR::EOQF)
+        self.is_running()
     }
 
     /// Perform an asynchronous read/write operation, whose
@@ -289,24 +344,20 @@ impl<'a> SpiMaster for Spi<'a> {
                         len: usize)
                         -> ReturnCode {
 
-        self.regs().sr.write(SR::EOQF::SET);
-
         self.start_of_queue();
         for i in 0..len {
+            while !self.tx_fifo_ready() {}
+
             if i == len - 1 {
                 self.end_of_queue();
             }
 
-            while !self.tx_fifo_ready() {}
-
             self.regs().pushr_data.set(write_buffer[i]);
         }
 
-        while self.is_busy() {}
-
-        self.client.get().map(move |client| {
-            client.read_write_done(write_buffer, read_buffer, len);
-        });
+        self.write.put(Some(write_buffer));
+        self.read.put(read_buffer);
+        self.transfer_len.set(len);
 
         ReturnCode::SUCCESS
     }
@@ -334,20 +385,23 @@ impl<'a> SpiMaster for Spi<'a> {
         // The PCS field is one-hot (the way this interface uses it).
         let pcs = self.regs().pushr_cmd.read(PUSHR_CMD::PCS);
         let old_cs = match pcs {
-            0b000001 => 0,
+            0 | 0b000001 => 0,
             0b000010 => 1,
             0b000100 => 2,
             0b001000 => 3,
             0b010000 => 4,
             0b100000 => 5,
-            _ => unreachable!()
+            _ => panic!("Unexpected PCS: {:?}", pcs),
         };
 
         let new_cs = cs as usize;
 
         // Swap in the new configuration.
+        self.halt();
         self.chip_select_settings[old_cs].set(self.regs().ctar0.get());
         self.regs().ctar0.set(self.chip_select_settings[new_cs].get());
+        self.resume();
+        self.regs().pushr_cmd.modify(PUSHR_CMD::PCS.val(1 << new_cs));
     }
 
     /// Returns the actual rate set
@@ -392,3 +446,7 @@ impl<'a> SpiMaster for Spi<'a> {
         self.regs().pushr_cmd.modify(PUSHR_CMD::CONT::ChipSelectAssertedBetweenTxfers);
     }
 }
+
+interrupt_handler!(spi0_interrupt_handler, SPI0);
+interrupt_handler!(spi1_interrupt_handler, SPI1);
+interrupt_handler!(spi2_interrupt_handler, SPI2);
