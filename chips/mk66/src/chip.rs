@@ -3,6 +3,7 @@ use kernel::common::{RingBuffer, Queue};
 use nvic;
 use pit;
 use spi;
+use gpio;
 
 pub struct MK66 {
     pub mpu: (),
@@ -40,6 +41,11 @@ impl Chip for MK66 {
             let iq = INTERRUPT_QUEUE.as_mut().unwrap();
             while let Some(interrupt) = iq.dequeue() {
                 match interrupt {
+                    PCMA => gpio::PA.handle_interrupt(),
+                    PCMB => gpio::PB.handle_interrupt(),
+                    PCMC => gpio::PC.handle_interrupt(),
+                    PCMD => gpio::PD.handle_interrupt(),
+                    PCME => gpio::PE.handle_interrupt(),
                     PIT2 => pit::PIT.handle_interrupt(),
                     SPI0 => spi::SPI0.handle_interrupt(),
                     SPI1 => spi::SPI1.handle_interrupt(),

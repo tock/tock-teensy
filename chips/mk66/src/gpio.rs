@@ -7,7 +7,7 @@ use core::cell::Cell;
 use core::sync::atomic::Ordering;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT};
-use common::regs::{RW, WO};
+use common::regs::{RW, WO, RO};
 use core::mem;
 use kernel::hil;
 use nvic::{self, NvicIdx};
@@ -19,7 +19,9 @@ pub struct PortRegisters {
     pcr: [RW<u32>; 32],
     gpclr: WO<u32>,
     gpchr: WO<u32>,
+    _reserved0: [RO<u32>; 6],
     isfr: RW<u32>,
+    _reserved1: [RO<u32>; 7],
     dfer: RW<u32>,
     dfcr: RW<u32>,
     dfwr: RW<u32>,
@@ -50,7 +52,7 @@ bitfields! [ u32,
             PullDown = 0,
             PullUp = 1
         ]
-    ] 
+    ]
 ];
 
 // Register map for a single GPIO port--aliased to bitband region
@@ -155,13 +157,14 @@ impl<'a> Port<'a> {
             let pin = fired.trailing_zeros() as usize;
             if pin < self.clients.len() {
                 fired &= !(1 << pin);
-                self.clients[pin].get().map(|client| client.fired(self.client_data[pin].get()));
+                self.clients[pin].get().map(|client| {
+                    client.fired(self.client_data[pin].get());
+                });
             } else {
                 break;
             }
         }
     }
-
 }
 
 const PORT_BASE_ADDRESS: usize = 0x4004_9000;
@@ -221,7 +224,6 @@ impl<'a, P: PinNum> Pin<'a, P> {
         self.set_peripheral_function(PeripheralFunction::Alt0);
         self.gpio.valid.swap(false, Ordering::Relaxed);
     }
-
 }
 
 impl<'a> Gpio<'a> {
@@ -481,3 +483,9 @@ pub mod functions {
     pub const SPI1_MOSI: Function<PinD06> = Function::new(Alt7);
     pub const SPI1_SCK: Function<PinD05> = Function::new(Alt7);
 }
+
+interrupt_handler!(porta_interrupt, PCMA);
+interrupt_handler!(portb_interrupt, PCMB);
+interrupt_handler!(portc_interrupt, PCMC);
+interrupt_handler!(portd_interrupt, PCMD);
+interrupt_handler!(porte_interrupt, PCME);
