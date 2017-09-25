@@ -7,7 +7,8 @@ PLATFORM=teensy
 TARGET = thumbv7em-none-eabi
 TEENSY_LOADER=teensy_loader_cli
 
-APP ?= blink
+APP ?= examples/blink
+APP_NAME = $(shell basename $(APP))
 
 # include the base Tock kernel makefile
 include ../../tock/boards/Makefile.common
@@ -18,7 +19,7 @@ program: target/$(TARGET)/release/$(PLATFORM).hex
 
 
 .PHONY: app
-app: target/$(TARGET)/release/$(PLATFORM)-$(APP).hex
+app: target/$(TARGET)/release/$(PLATFORM)-$(APP_NAME).hex
 	$(TEENSY_LOADER) -mmcu=$(MCU) -v -w $<
 
 
@@ -27,13 +28,13 @@ app: target/$(TARGET)/release/$(PLATFORM)-$(APP).hex
 	@make -C ../../apps/$(APP) TOCK_ARCH=$(TOCK_ARCH)
 
 
-target/$(TARGET)/release/$(PLATFORM)-$(APP): target/$(TARGET)/release/$(PLATFORM) ../../apps/$(APP)/build/$(TOCK_ARCH)/app 
+target/$(TARGET)/release/$(PLATFORM)-$(APP_NAME): target/$(TARGET)/release/$(PLATFORM) ../../apps/$(APP)/build/$(TOCK_ARCH)/app 
 	$(Q)$(OBJCOPY) --update-section .apps=../../apps/$(APP)/build/cortex-m4/cortex-m4.bin \
 		--set-section-flags .apps=alloc,code \
 		target/$(TARGET)/release/$(PLATFORM) $@
 
-target/$(TARGET)/release/$(PLATFORM)-$(APP).elf: target/$(TARGET)/release/$(PLATFORM)-$(APP)
+target/$(TARGET)/release/$(PLATFORM)-$(APP_NAME).elf: target/$(TARGET)/release/$(PLATFORM)-$(APP_NAME)
 	$(Q)cp $^ $@
 
-target/$(TARGET)/release/$(PLATFORM)-$(APP).hex: target/$(TARGET)/release/$(PLATFORM)-$(APP).elf
+target/$(TARGET)/release/$(PLATFORM)-$(APP_NAME).hex: target/$(TARGET)/release/$(PLATFORM)-$(APP_NAME).elf
 	$(Q)$(OBJCOPY) -Oihex $^ $@

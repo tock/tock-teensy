@@ -199,9 +199,9 @@ impl<'a> Spi<'a> {
         // Since there are only 128 unique settings, just iterate over possible
         // configurations until we find the best match. If baud rate can be
         // matched exactly, this loop will terminate early.
-        for p in 0..prescalers.len() {
-            for s in 0..scalers.len() {
-                for d in 0..dbls.len() {
+        for d in 0..dbls.len() { // 0 is preferred for DBL, as it affects duty cycle
+            for p in 0..prescalers.len() {
+                for s in 0..scalers.len() {
                     let curr_rate = Spi::baud_rate(dbls[d],
                                                    prescalers[p],
                                                    scalers[s]);
@@ -266,6 +266,13 @@ impl<'a> Spi<'a> {
         self.regs().pushr_cmd.modify(PUSHR_CMD::EOQ::SET);
     }
 
+    fn configure_timing(&self) {
+        self.halt();
+        // Set maximum delay after transfer.
+        self.regs().ctar0.modify(CTAR::DT.val(0x0) + CTAR::PDT::Delay7);
+        self.resume();
+    }
+
     fn set_frame_size(&self, size: u32) {
         if size > 16 || size < 4 { return }
 
@@ -324,6 +331,7 @@ impl<'a> SpiMaster for Spi<'a> {
         self.enable();
 
         self.set_frame_size(8);
+        self.configure_timing();
         self.regs().mcr.modify(MCR::PCSIS::AllInactiveHigh);
         self.regs().pushr_cmd.modify(PUSHR_CMD::PCS.val(0));
     }

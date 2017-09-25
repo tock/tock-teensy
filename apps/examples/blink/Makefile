@@ -1,7 +1,9 @@
 # Makefile for user applications
 
 # Specify this directory relative to the current application.
-TOCK_USERLAND_BASE_DIR = ../../tock/userland
+# NOTE: This should be the only line, if any, that you need to change to build
+# basic C applications.
+include ../../MakeVariables.mk
 
 # Which files to compile.
 C_SRCS := $(wildcard *.c)
@@ -10,4 +12,4 @@ C_SRCS := $(wildcard *.c)
 # building the application.
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
 
-APP=$(shell basename $(CURDIR))
+APP=$(patsubst $(APPS_DIR),,$(CURDIR))
