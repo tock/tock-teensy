@@ -5,6 +5,7 @@
 pub mod macros;
 
 use core::ops::{BitAnd, BitOr, Not, Shr, Shl, Add};
+use core::marker::PhantomData;
 
 pub trait IntLike: BitAnd<Output=Self> +
                    BitOr<Output=Self> +
@@ -31,22 +32,32 @@ impl IntLike for u32 {
     }
 }
 
-pub struct RW<T: IntLike> {
+pub trait RegisterLongName {}
+
+impl RegisterLongName for () {}
+
+pub struct RW<T: IntLike, R: RegisterLongName=()> {
     value: T,
+    associated_register: PhantomData<R>
 }
 
-pub struct RO<T: IntLike> {
+pub struct RO<T: IntLike, R: RegisterLongName=()> {
     value: T,
+    associated_register: PhantomData<R>
 }
 
-pub struct WO<T: IntLike> {
+pub struct WO<T: IntLike, R: RegisterLongName=()> {
     value: T,
+    associated_register: PhantomData<R>
 }
 
 #[allow(dead_code)]
-impl<T: IntLike> RW<T> {
+impl<T: IntLike, R: RegisterLongName> RW<T, R> {
     pub const fn new(value: T) -> Self {
-        RW { value: value }
+        RW {
+            value: value,
+            associated_register: PhantomData
+        }
     }
 
     #[inline]
@@ -60,37 +71,40 @@ impl<T: IntLike> RW<T> {
     }
 
     #[inline]
-    pub fn read(&self, field: Field<T>) -> T
+    pub fn read(&self, field: Field<T, R>) -> T
     {
         (self.get() & (field.mask << field.shift)) >> field.shift
     }
 
     #[inline]
-    pub fn write(&self, field: FieldValue<T>) {
+    pub fn write(&self, field: FieldValue<T, R>) {
         self.set(field.value);
     }
 
     #[inline]
-    pub fn modify(&self, field: FieldValue<T>) {
+    pub fn modify(&self, field: FieldValue<T, R>) {
         let reg: T = self.get();
         self.set((reg & !field.mask) | field.value);
     }
 
     #[inline]
-    pub fn is_set(&self, field: Field<T>) -> bool {
+    pub fn is_set(&self, field: Field<T, R>) -> bool {
         self.read(field) != T::zero()
     }
 
     #[inline]
-    pub fn matches(&self, field: FieldValue<T>) -> bool {
+    pub fn matches(&self, field: FieldValue<T, R>) -> bool {
         self.get() & field.mask == field.value
     }
 }
 
 #[allow(dead_code)]
-impl<T: IntLike> RO<T> {
+impl<T: IntLike, R: RegisterLongName> RO<T, R> {
     pub const fn new(value: T) -> Self {
-        RO { value: value }
+        RO {
+            value: value,
+            associated_register: PhantomData
+        }
     }
 
     #[inline]
@@ -99,26 +113,29 @@ impl<T: IntLike> RO<T> {
     }
 
     #[inline]
-    pub fn read(&self, field: Field<T>) -> T
+    pub fn read(&self, field: Field<T, R>) -> T
     {
         (self.get() & (field.mask << field.shift)) >> field.shift
     }
 
     #[inline]
-    pub fn is_set(&self, field: Field<T>) -> bool {
+    pub fn is_set(&self, field: Field<T, R>) -> bool {
         self.read(field) != T::zero()
     }
 
     #[inline]
-    pub fn matches(&self, field: FieldValue<T>) -> bool {
+    pub fn matches(&self, field: FieldValue<T, R>) -> bool {
         self.get() & field.mask == field.value
     }
 }
 
 #[allow(dead_code)]
-impl<T: IntLike> WO<T> {
+impl<T: IntLike, R: RegisterLongName> WO<T, R> {
     pub const fn new(value: T) -> Self {
-        WO { value: value }
+        WO {
+            value: value,
+            associated_register: PhantomData
+        }
     }
 
     #[inline]
@@ -127,101 +144,110 @@ impl<T: IntLike> WO<T> {
     }
 
     #[inline]
-    pub fn write(&self, field: FieldValue<T>) {
+    pub fn write(&self, field: FieldValue<T, R>) {
         self.set(field.value);
     }
 }
 
 #[derive(Copy, Clone)]
-pub struct Field<T: IntLike> {
+pub struct Field<T: IntLike, R: RegisterLongName> {
     mask: T,
-    shift: u32
+    shift: u32,
+    associated_register: PhantomData<R>
 }
 
 // For the Field, the mask is unshifted, ie. the LSB should always be set
-impl Field<u8> {
-    pub const fn new(mask: u8, shift: u32) -> Field<u8> {
+impl<R: RegisterLongName> Field<u8, R> {
+    pub const fn new(mask: u8, shift: u32) -> Field<u8, R> {
         Field {
             mask: mask,
-            shift: shift
+            shift: shift,
+            associated_register: PhantomData
         }
     }
 
-    pub fn val(&self, value: u8) -> FieldValue<u8> {
-        FieldValue::<u8>::new(self.mask, self.shift, value)
+    pub fn val(&self, value: u8) -> FieldValue<u8, R> {
+        FieldValue::<u8, R>::new(self.mask, self.shift, value)
     }
 }
 
-impl Field<u16> {
-    pub const fn new(mask: u16, shift: u32) -> Field<u16> {
+impl<R: RegisterLongName> Field<u16, R> {
+    pub const fn new(mask: u16, shift: u32) -> Field<u16, R> {
         Field {
             mask: mask,
-            shift: shift
+            shift: shift,
+            associated_register: PhantomData
         }
     }
 
-    pub fn val(&self, value: u16) -> FieldValue<u16> {
-        FieldValue::<u16>::new(self.mask, self.shift, value)
+    pub fn val(&self, value: u16) -> FieldValue<u16, R> {
+        FieldValue::<u16, R>::new(self.mask, self.shift, value)
     }
 }
 
-impl Field<u32> {
-    pub const fn new(mask: u32, shift: u32) -> Field<u32> {
+impl<R: RegisterLongName> Field<u32, R> {
+    pub const fn new(mask: u32, shift: u32) -> Field<u32, R> {
         Field {
             mask: mask,
-            shift: shift
+            shift: shift,
+            associated_register: PhantomData
         }
     }
 
-    pub fn val(&self, value: u32) -> FieldValue<u32> {
-        FieldValue::<u32>::new(self.mask, self.shift, value)
+    pub fn val(&self, value: u32) -> FieldValue<u32, R> {
+        FieldValue::<u32, R>::new(self.mask, self.shift, value)
     }
 }
 
 
 // For the FieldValue, the masks and values are shifted into their actual location in the register
 #[derive(Copy, Clone)]
-pub struct FieldValue<T: IntLike> {
+pub struct FieldValue<T: IntLike, R: RegisterLongName> {
     mask: T,
-    value: T
+    value: T,
+    associated_register: PhantomData<R>
 }
 
 // Necessary to split the implementation of u8 and u32 out because the bitwise math isn't treated
 // as const when the type is generic
-impl FieldValue<u8> {
+impl<R: RegisterLongName> FieldValue<u8, R> {
     pub const fn new(mask: u8, shift: u32, value: u8) -> Self {
         FieldValue {
             mask: mask << shift,
-            value: (value << shift) & (mask << shift)
+            value: (value << shift) & (mask << shift),
+            associated_register: PhantomData
         }
     }
 }
 
-impl FieldValue<u16> {
+impl<R: RegisterLongName> FieldValue<u16, R> {
     pub const fn new(mask: u16, shift: u32, value: u16) -> Self {
         FieldValue {
             mask: mask << shift,
-            value: (value << shift) & (mask << shift)
+            value: (value << shift) & (mask << shift),
+            associated_register: PhantomData
         }
     }
 }
 
-impl FieldValue<u32> {
+impl<R: RegisterLongName> FieldValue<u32, R> {
     pub const fn new(mask: u32, shift: u32, value: u32) -> Self {
         FieldValue {
             mask: mask << shift,
-            value: (value << shift) & (mask << shift)
+            value: (value << shift) & (mask << shift),
+            associated_register: PhantomData
         }
     }
 }
 
 // Combine two fields with the addition operator
-impl<T: IntLike> Add for FieldValue<T> {
+impl<T: IntLike, R: RegisterLongName> Add for FieldValue<T, R> {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
         FieldValue {
             mask: self.mask | rhs.mask,
-            value: self.value | rhs.value
+            value: self.value | rhs.value,
+            associated_register: PhantomData
         }
     }
 }

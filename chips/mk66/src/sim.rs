@@ -4,96 +4,137 @@ use core::mem;
 use regs::sim::*;
 use common::regs::FieldValue;
 
-pub type Clock = (u32, FieldValue<u32>);
+pub type Clock1 = FieldValue<u32, SystemClockGatingControl1>;
+pub type Clock2 = FieldValue<u32, SystemClockGatingControl2>;
+pub type Clock3 = FieldValue<u32, SystemClockGatingControl3>;
+pub type Clock4 = FieldValue<u32, SystemClockGatingControl4>;
+pub type Clock5 = FieldValue<u32, SystemClockGatingControl5>;
+pub type Clock6 = FieldValue<u32, SystemClockGatingControl6>;
+pub type Clock7 = FieldValue<u32, SystemClockGatingControl7>;
 
-pub mod clocks {
-    use sim::Clock;
-    use regs::sim::*;
-    pub const UART4: Clock = (1, SCGC1::UART4::SET);
-    pub const I2C2: Clock = (1, SCGC1::I2C2::SET);
-    pub const I2C3: Clock = (1, SCGC1::I2C3::SET);
-
-    pub const DAC1: Clock = (2, SCGC2::DAC1::SET);
-    pub const DAC0: Clock = (2, SCGC2::DAC0::SET);
-    pub const TPM2: Clock = (2, SCGC2::TPM2::SET);
-    pub const TPM1: Clock = (2, SCGC2::TPM1::SET);
-    pub const LPUART0: Clock = (2, SCGC2::LPUART0::SET);
-    pub const ENET: Clock = (2, SCGC2::ENET::SET);
-
-    pub const ADC1: Clock = (3, SCGC3::ADC1::SET);
-    pub const FTM3: Clock = (3, SCGC3::FTM3::SET);
-    pub const FTM2: Clock = (3, SCGC3::FTM2::SET);
-    pub const SDHC: Clock = (3, SCGC3::SDHC::SET);
-    pub const SPI2: Clock = (3, SCGC3::SPI2::SET);
-    pub const FLEXCAN1: Clock = (3, SCGC3::FLEXCAN1::SET);
-    pub const USBHSDCD: Clock = (3, SCGC3::USBHSDCD::SET);
-    pub const USBHSPHY: Clock = (3, SCGC3::USBHSPHY::SET);
-    pub const USBHS: Clock = (3, SCGC3::USBHS::SET);
-    pub const RNGA: Clock = (3, SCGC3::RNGA::SET);
-
-    pub const VREF: Clock = (4, SCGC4::VREF::SET);
-    pub const CMP: Clock = (4, SCGC4::CMP::SET);
-    pub const USBOTG: Clock = (4, SCGC4::USBOTG::SET);
-    pub const UART3: Clock = (4, SCGC4::UART3::SET);
-    pub const UART2: Clock = (4, SCGC4::UART2::SET);
-    pub const UART1: Clock = (4, SCGC4::UART1::SET);
-    pub const UART0: Clock = (4, SCGC4::UART0::SET);
-    pub const I2C1: Clock = (4, SCGC4::I2C1::SET);
-    pub const I2C0: Clock = (4, SCGC4::I2C0::SET);
-    pub const CMT: Clock = (4, SCGC4::CMT::SET);
-    pub const EWM: Clock = (4, SCGC4::EWM::SET);
-
-    pub const UART: [Clock; 5] = [UART0, UART1, UART2, UART3, UART4];
-
-    pub const PORTE: Clock = (5, SCGC5::PORT::E);
-    pub const PORTD: Clock = (5, SCGC5::PORT::D);
-    pub const PORTC: Clock = (5, SCGC5::PORT::C);
-    pub const PORTB: Clock = (5, SCGC5::PORT::B);
-    pub const PORTA: Clock = (5, SCGC5::PORT::A);
-    pub const PORTABCDE: Clock = (5, SCGC5::PORT::All);
-    pub const TSI: Clock = (5, SCGC5::TSI::SET);
-    pub const LPTMR: Clock = (5, SCGC5::LPTMR::SET);
-
-    // DAC0,
-    pub const RTC: Clock = (6, SCGC6::RTC::SET);
-    pub const ADC0: Clock = (6, SCGC6::ADC0::SET);
-    // FTM2,
-    pub const FTM1: Clock = (6, SCGC6::FTM1::SET);
-    pub const FTM0: Clock = (6, SCGC6::FTM0::SET);
-    pub const PIT: Clock = (6, SCGC6::PIT::SET);
-    pub const PDB: Clock = (6, SCGC6::PDB::SET);
-    pub const USBDCD: Clock = (6, SCGC6::USBDCD::SET);
-    pub const CRC: Clock = (6, SCGC6::CRC::SET);
-    pub const I2S: Clock = (6, SCGC6::I2S::SET);
-    pub const SPI1: Clock = (6, SCGC6::SPI1::SET);
-    pub const SPI0: Clock = (6, SCGC6::SPI0::SET);
-
-    pub const SPI: [Clock; 3] = [SPI0, SPI1, SPI2];
-
-    // RNGA,
-    pub const FLEXCAN0: Clock = (6, SCGC6::FLEXCAN0::SET);
-    pub const DMAMUX: Clock = (6, SCGC6::DMAMUX::SET);
-    pub const FTF: Clock = (6, SCGC6::FTF::SET);
-
-    pub const SDRAMC: Clock = (7, SCGC7::SDRAMC::SET);
-    pub const MPU: Clock = (7, SCGC7::MPU::SET);
-    pub const DMA: Clock = (7, SCGC7::DMA::SET);
-    pub const FLEXBUS: Clock = (7, SCGC7::FLEXBUS::SET);
+pub trait Clock {
+    fn enable(self);
 }
 
-pub fn enable_clock(clock: Clock) {
-    let regs: &mut Registers = unsafe { mem::transmute(SIM) };
+impl Clock for Clock1 {
+    fn enable(self) {
+        let regs: &mut Registers = unsafe { mem::transmute(SIM) };
+        regs.scgc1.modify(self);
+    }
+}
 
-    match clock {
-        (1, c) => regs.scgc1.modify(c),
-        (2, c) => regs.scgc2.modify(c),
-        (3, c) => regs.scgc3.modify(c),
-        (4, c) => regs.scgc4.modify(c),
-        (5, c) => regs.scgc5.modify(c),
-        (6, c) => regs.scgc6.modify(c),
-        (7, c) => regs.scgc7.modify(c),
-        _ => ()
-    };
+impl Clock for Clock2 {
+    fn enable(self) {
+        let regs: &mut Registers = unsafe { mem::transmute(SIM) };
+        regs.scgc2.modify(self);
+    }
+}
+
+impl Clock for Clock3 {
+    fn enable(self) {
+        let regs: &mut Registers = unsafe { mem::transmute(SIM) };
+        regs.scgc3.modify(self);
+    }
+}
+
+impl Clock for Clock4 {
+    fn enable(self) {
+        let regs: &mut Registers = unsafe { mem::transmute(SIM) };
+        regs.scgc4.modify(self);
+    }
+}
+
+impl Clock for Clock5 {
+    fn enable(self) {
+        let regs: &mut Registers = unsafe { mem::transmute(SIM) };
+        regs.scgc5.modify(self);
+    }
+}
+
+impl Clock for Clock6 {
+    fn enable(self) {
+        let regs: &mut Registers = unsafe { mem::transmute(SIM) };
+        regs.scgc6.modify(self);
+    }
+}
+
+impl Clock for Clock7 {
+    fn enable(self) {
+        let regs: &mut Registers = unsafe { mem::transmute(SIM) };
+        regs.scgc7.modify(self);
+    }
+}
+
+pub mod clocks {
+    use sim::{Clock1, Clock2, Clock3, Clock4, Clock5, Clock6, Clock7};
+    use regs::sim::*;
+
+    pub const UART4: Clock1 = SCGC1::UART4::SET;
+    pub const I2C2: Clock1 = SCGC1::I2C2::SET;
+    pub const I2C3: Clock1 = SCGC1::I2C3::SET;
+
+    pub const DAC1: Clock2 = SCGC2::DAC1::SET;
+    pub const DAC0: Clock2 = SCGC2::DAC0::SET;
+    pub const TPM2: Clock2 = SCGC2::TPM2::SET;
+    pub const TPM1: Clock2 = SCGC2::TPM1::SET;
+    pub const LPUART0: Clock2 = SCGC2::LPUART0::SET;
+    pub const ENET: Clock2 = SCGC2::ENET::SET;
+
+    pub const ADC1: Clock3 = SCGC3::ADC1::SET;
+    pub const FTM3: Clock3 = SCGC3::FTM3::SET;
+    pub const FTM2: Clock3 = SCGC3::FTM2::SET;
+    pub const SDHC: Clock3 = SCGC3::SDHC::SET;
+    pub const SPI2: Clock3 = SCGC3::SPI2::SET;
+    pub const FLEXCAN1: Clock3 = SCGC3::FLEXCAN1::SET;
+    pub const USBHSDCD: Clock3 = SCGC3::USBHSDCD::SET;
+    pub const USBHSPHY: Clock3 = SCGC3::USBHSPHY::SET;
+    pub const USBHS: Clock3 = SCGC3::USBHS::SET;
+    pub const RNGA: Clock3 = SCGC3::RNGA::SET;
+
+    pub const VREF: Clock4 = SCGC4::VREF::SET;
+    pub const CMP: Clock4 = SCGC4::CMP::SET;
+    pub const USBOTG: Clock4 = SCGC4::USBOTG::SET;
+    pub const UART3: Clock4 = SCGC4::UART3::SET;
+    pub const UART2: Clock4 = SCGC4::UART2::SET;
+    pub const UART1: Clock4 = SCGC4::UART1::SET;
+    pub const UART0: Clock4 = SCGC4::UART0::SET;
+    pub const I2C1: Clock4 = SCGC4::I2C1::SET;
+    pub const I2C0: Clock4 = SCGC4::I2C0::SET;
+    pub const CMT: Clock4 = SCGC4::CMT::SET;
+    pub const EWM: Clock4 = SCGC4::EWM::SET;
+
+    pub const PORTE: Clock5 = SCGC5::PORT::E;
+    pub const PORTD: Clock5 = SCGC5::PORT::D;
+    pub const PORTC: Clock5 = SCGC5::PORT::C;
+    pub const PORTB: Clock5 = SCGC5::PORT::B;
+    pub const PORTA: Clock5 = SCGC5::PORT::A;
+    pub const PORTABCDE: Clock5 = SCGC5::PORT::All;
+    pub const TSI: Clock5 = SCGC5::TSI::SET;
+    pub const LPTMR: Clock5 = SCGC5::LPTMR::SET;
+
+    // DAC0,
+    pub const RTC: Clock6 = SCGC6::RTC::SET;
+    pub const ADC0: Clock6 = SCGC6::ADC0::SET;
+    // FTM2,
+    pub const FTM1: Clock6 = SCGC6::FTM1::SET;
+    pub const FTM0: Clock6 = SCGC6::FTM0::SET;
+    pub const PIT: Clock6 = SCGC6::PIT::SET;
+    pub const PDB: Clock6 = SCGC6::PDB::SET;
+    pub const USBDCD: Clock6 = SCGC6::USBDCD::SET;
+    pub const CRC: Clock6 = SCGC6::CRC::SET;
+    pub const I2S: Clock6 = SCGC6::I2S::SET;
+    pub const SPI1: Clock6 = SCGC6::SPI1::SET;
+    pub const SPI0: Clock6 = SCGC6::SPI0::SET;
+
+    // RNGA,
+    pub const FLEXCAN0: Clock6 = SCGC6::FLEXCAN0::SET;
+    pub const DMAMUX: Clock6 = SCGC6::DMAMUX::SET;
+    pub const FTF: Clock6 = SCGC6::FTF::SET;
+
+    pub const SDRAMC: Clock7 = SCGC7::SDRAMC::SET;
+    pub const MPU: Clock7 = SCGC7::MPU::SET;
+    pub const DMA: Clock7 = SCGC7::DMA::SET;
+    pub const FLEXBUS: Clock7 = SCGC7::FLEXBUS::SET;
 }
 
 pub fn set_dividers(core: u32, bus: u32, flash: u32) {

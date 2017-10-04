@@ -2,17 +2,17 @@ use common::regs::{RW, RO};
 
 #[repr(C, packed)]
 pub struct Registers {
-    pub mcr: RW<u32>,
+    pub mcr: RW<u32, ModuleConfiguration>,
     _reserved0: RO<u32>,
-    pub tcr: RW<u32>,
-    pub ctar0: RW<u32>,
-    pub ctar1: RW<u32>,
+    pub tcr: RW<u32, TransferCount>,
+    pub ctar0: RW<u32, ClockAndTransferAttributes>,
+    pub ctar1: RW<u32, ClockAndTransferAttributes>,
     _reserved1: [RO<u32>; 6],
-    pub sr: RW<u32>,
-    pub rser: RW<u32>,
+    pub sr: RW<u32, Status>,
+    pub rser: RW<u32, RequestSelectAndEnable>,
     pub pushr_data: RW<u8>,
     _reserved2: RW<u8>,
-    pub pushr_cmd: RW<u16>,
+    pub pushr_cmd: RW<u16, TxFifoPushCommand>,
     pub popr: RO<u32>,
     pub txfifo: [RO<u32>; 4],
     _reserved3: [RO<u32>; 12],
@@ -24,7 +24,7 @@ pub const SPI_ADDRS: [*mut Registers; 3] = [0x4002_C000 as *mut Registers,
                                             0x400A_C000 as *mut Registers];
 
 bitfields![ u32,
-    MCR [
+    MCR ModuleConfiguration [
         MSTR 31 [
             Master = 1,
             Slave = 0
@@ -40,7 +40,7 @@ bitfields![ u32,
             IgnoreOverflow = 0,
             ShiftOverflow = 1
         ],
-        PCSIS (0b11_1111, 16) [
+        PCSIS (Mask(0b11_1111), 16) [
             AllInactiveHigh = 0x3F,
             AllInactiveLow = 0x0
         ],
@@ -50,7 +50,7 @@ bitfields![ u32,
         DIS_RXF 12 [],
         CLR_TXF 11 [],
         CLR_RXF 10 [],
-        SMPL_PT (0b11, 8) [
+        SMPL_PT (Mask(0b11), 8) [
             ZeroCycles = 0,
             OneCycle = 1,
             TwoCycles = 2
@@ -58,13 +58,13 @@ bitfields![ u32,
         HALT 0 []
     ],
 
-    TCR [
-        SPI_TCNT (0xFFFF, 16) []
+    TCR TransferCount [
+        SPI_TCNT (Mask(0xFFFF), 16) []
     ],
 
-    CTAR [
+    CTAR ClockAndTransferAttributes [
         DBR 31 [],
-        FMSZ (0xF, 27) [],
+        FMSZ (Mask(0xF), 27) [],
         CPOL 26 [
             IdleLow = 0,
             IdleHigh = 1
@@ -77,31 +77,31 @@ bitfields![ u32,
             MsbFirst = 0,
             LsbFirst = 1
         ],
-        PCSSCK (0b11, 22) [
+        PCSSCK (Mask(0b11), 22) [
             Prescaler1 = 0,
             Prescaler3 = 1,
             Prescaler5 = 2,
             Prescaler7 = 3
         ],
-        PASC (0b11, 20) [
+        PASC (Mask(0b11), 20) [
             Delay1 = 0,
             Delay3 = 1,
             Delay5 = 2,
             Delay7 = 3
         ],
-        PDT (0b11, 18) [
+        PDT (Mask(0b11), 18) [
             Delay1 = 0,
             Delay3 = 1,
             Delay5 = 2,
             Delay7 = 3
         ],
-        PBR (0b11, 16) [
+        PBR (Mask(0b11), 16) [
             BaudRatePrescaler2 = 0,
             BaudRatePrescaler3 = 1,
             BaudRatePrescaler5 = 2,
             BaudRatePrescaler7 = 3
         ],
-        CSSCK (0b1111, 12) [
+        CSSCK (Mask(0b1111), 12) [
             DelayScaler2 = 0x0,
             DelayScaler4 = 0x1,
             DelayScaler8 = 0x2,
@@ -119,9 +119,9 @@ bitfields![ u32,
             DelayScaler32768 = 0xE,
             DelayScaler65536 = 0xF
         ],
-        ASC (0b1111, 8) [],
-        DT (0b1111, 4) [],
-        BR (0b1111, 0) [
+        ASC (Mask(0b1111), 8) [],
+        DT (Mask(0b1111), 4) [],
+        BR (Mask(0b1111), 0) [
             BaudRateScaler2 = 0x0,
             BaudRateScaler4 = 0x1,
             BaudRateScaler8 = 0x2,
@@ -141,8 +141,8 @@ bitfields![ u32,
         ]
     ],
 
-    CTAR_SLAVE [
-        FMSZ (0xF, 27) [],
+    CTAR_SLAVE ClockAndTransferAttributesSlave [
+        FMSZ (Mask(0xF), 27) [],
         CPOL 26 [
             IdleLow = 0,
             IdleHigh = 1
@@ -153,7 +153,7 @@ bitfields![ u32,
         ]
     ],
 
-    SR [
+    SR Status [
         TCF 31 [],
         TXRS 30 [],
         EOQF 28 [],
@@ -161,13 +161,13 @@ bitfields![ u32,
         TFFF 25 [],
         RFOF 19 [],
         RFDF 17 [],
-        TXCTR (0xF, 12) [],
-        TXNXTPTR (0xF, 8) [],
-        RXCTR (0xF, 4) [],
-        POPNXTPTR (0xF, 0) []
+        TXCTR (Mask(0xF), 12) [],
+        TXNXTPTR (Mask(0xF), 8) [],
+        RXCTR (Mask(0xF), 4) [],
+        POPNXTPTR (Mask(0xF), 0) []
     ],
 
-    RSER [
+    RSER RequestSelectAndEnable [
         TCF_RE 31 [],
         EOQF_RE 28 [],
         TFUF_RE 27 [],
@@ -186,17 +186,17 @@ bitfields![ u32,
 ];
 
 bitfields![ u16, 
-    PUSHR_CMD [
+    PUSHR_CMD TxFifoPushCommand [
         CONT 15 [
             ChipSelectInactiveBetweenTxfers = 0,
             ChipSelectAssertedBetweenTxfers = 1
         ],
-        CTAS (0b111, 12) [
+        CTAS (Mask(0b111), 12) [
             Ctar0 = 0,
             Ctar1 = 1
         ],
         EOQ 11 [],
         CTCNT 10 [],
-        PCS (0b111111, 0) []
+        PCS (Mask(0b111111), 0) []
     ]
 ];

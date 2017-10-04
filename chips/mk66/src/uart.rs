@@ -6,7 +6,6 @@ use kernel::hil::uart;
 use core::mem;
 use nvic;
 use regs::uart::*;
-use sim;
 use clock;
 
 pub struct Uart {
@@ -98,7 +97,15 @@ impl Uart {
     }
 
     fn enable_clock(&self) {
-        sim::enable_clock(sim::clocks::UART[self.index]);
+        use sim::{clocks, Clock};
+        match self.index {
+            0 => clocks::UART0.enable(),
+            1 => clocks::UART1.enable(),
+            2 => clocks::UART2.enable(),
+            3 => clocks::UART3.enable(),
+            4 => clocks::UART4.enable(),
+            _ => unreachable!()
+        };
     }
 
     pub fn send_byte(&self, byte: u8) {

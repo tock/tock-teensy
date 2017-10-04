@@ -79,6 +79,7 @@ pub unsafe fn set_pin_primary_functions() {
 #[no_mangle]
 pub unsafe fn reset_handler() {
     use mk66::{clock, wdog, sim, pit, spi, uart};
+    use mk66::sim::Clock;
     use mk66::gpio::*;
 
     // Disable the watchdog.
@@ -91,7 +92,7 @@ pub unsafe fn reset_handler() {
     clock::configure(120);
 
     // Enable the Port Control and Interrupt clocks.
-    sim::enable_clock(sim::clocks::PORTABCDE);
+    sim::clocks::PORTABCDE.enable();
 
     pit::PIT.init();
     spi::SPI1.init();

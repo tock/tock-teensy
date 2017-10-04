@@ -16,7 +16,7 @@ use nvic::{self, NvicIdx};
 // [^1]: Section 12.5
 #[repr(C, packed)]
 pub struct PortRegisters {
-    pcr: [RW<u32>; 32],
+    pcr: [RW<u32, PinControl>; 32],
     gpclr: WO<u32>,
     gpchr: WO<u32>,
     _reserved0: [RO<u32>; 6],
@@ -28,9 +28,9 @@ pub struct PortRegisters {
 }
 
 bitfields! [ u32,
-    PCR [
+    PCR PinControl [
         ISF 24 [],
-        IRQC (0b1111, 16) [
+        IRQC (Mask(0b1111), 16) [
             InterruptDisabled = 0,
             DmaRisingEdge = 1,
             DmaFallingEdge = 2,
@@ -42,7 +42,7 @@ bitfields! [ u32,
             InterruptLogicHigh = 12
         ],
         LK 15 [],
-        MUX (0b111, 8) [],
+        MUX (Mask(0b111), 8) [],
         DSE 6 [],
         ODE 5 [],
         PFE 4 [],
