@@ -1,22 +1,22 @@
-use common::regs::{RW, RO};
+use common::regs::{ReadWrite, ReadOnly};
 
 #[repr(C, packed)]
 pub struct Registers {
-    pub mcr: RW<u32, ModuleConfiguration>,
-    _reserved0: RO<u32>,
-    pub tcr: RW<u32, TransferCount>,
-    pub ctar0: RW<u32, ClockAndTransferAttributes>,
-    pub ctar1: RW<u32, ClockAndTransferAttributes>,
-    _reserved1: [RO<u32>; 6],
-    pub sr: RW<u32, Status>,
-    pub rser: RW<u32, RequestSelectAndEnable>,
-    pub pushr_data: RW<u8>,
-    _reserved2: RW<u8>,
-    pub pushr_cmd: RW<u16, TxFifoPushCommand>,
-    pub popr: RO<u32>,
-    pub txfifo: [RO<u32>; 4],
-    _reserved3: [RO<u32>; 12],
-    pub rxfifo: [RO<u32>; 4]
+    pub mcr: ReadWrite<u32, ModuleConfiguration>,
+    _reserved0: ReadOnly<u32>,
+    pub tcr: ReadWrite<u32, TransferCount>,
+    pub ctar0: ReadWrite<u32, ClockAndTransferAttributes>,
+    pub ctar1: ReadWrite<u32, ClockAndTransferAttributes>,
+    _reserved1: [ReadOnly<u32>; 6],
+    pub sr: ReadWrite<u32, Status>,
+    pub rser: ReadWrite<u32, RequestSelectAndEnable>,
+    pub pushr_data: ReadWrite<u8>,
+    _reserved2: ReadWrite<u8>,
+    pub pushr_cmd: ReadWrite<u16, TxFifoPushCommand>,
+    pub popr: ReadOnly<u32>,
+    pub txfifo: [ReadOnly<u32>; 4],
+    _reserved3: [ReadOnly<u32>; 12],
+    pub rxfifo: [ReadOnly<u32>; 4]
 }
 
 pub const SPI_ADDRS: [*mut Registers; 3] = [0x4002_C000 as *mut Registers,

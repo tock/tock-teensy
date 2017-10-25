@@ -1,46 +1,46 @@
-use common::regs::{RW, RO};
+use common::regs::{ReadWrite, ReadOnly};
 
 #[repr(C, packed)]
 pub struct Registers {
-    pub bdh: RW<u8, BaudRateHigh>,
-    pub bdl: RW<u8>,
-    pub c1: RW<u8, Control1>,
-    pub c2: RW<u8, Control2>,
-    pub s1: RO<u8, Status1>,
-    pub s2: RW<u8, Status2>,
-    pub c3: RW<u8, Control3>,
-    pub d: RW<u8>,
-    pub ma1: RW<u8>,
-    pub ma2: RW<u8>,
-    pub c4: RW<u8, Control4>,
-    pub c5: RW<u8, Control5>,
-    pub ed: RO<u8>,
-    pub modem: RW<u8>,
-    pub ir: RW<u8>, // 0x0E
-    _reserved0: RW<u8>,
-    pub pfifo: RW<u8>, // 0x10
-    pub cfifo: RW<u8>,
-    pub sfifo: RW<u8>,
-    pub twfifo: RW<u8>,
-    pub tcfifo: RO<u8>,
-    pub rwfifo: RW<u8>,
-    pub rcfifo: RO<u8>, // 0x16
-    _reserved1: RW<u8>,
-    pub c7816: RW<u8>, // 0x18
-    pub ie7816: RW<u8>,
-    pub is7816: RW<u8>,
-    pub wp7816: RW<u8>,
-    pub wn7816: RW<u8>,
-    pub wf7816: RW<u8>,
-    pub et7816: RW<u8>,
-    pub tl7816: RW<u8>, // 0x1F
-    _reserved2: [RW<u8>; 26],
-    pub ap7816a_t0: RW<u8>, // 0x3A
-    pub ap7816b_t0: RW<u8>,
-    pub wp7816a_t0_t1: RW<u8>,
-    pub wp7816b_t0_t1: RW<u8>,
-    pub wgp7816_t1: RW<u8>,
-    pub wp7816c_t1: RW<u8>,
+    pub bdh: ReadWrite<u8, BaudRateHigh>,
+    pub bdl: ReadWrite<u8>,
+    pub c1: ReadWrite<u8, Control1>,
+    pub c2: ReadWrite<u8, Control2>,
+    pub s1: ReadOnly<u8, Status1>,
+    pub s2: ReadWrite<u8, Status2>,
+    pub c3: ReadWrite<u8, Control3>,
+    pub d: ReadWrite<u8>,
+    pub ma1: ReadWrite<u8>,
+    pub ma2: ReadWrite<u8>,
+    pub c4: ReadWrite<u8, Control4>,
+    pub c5: ReadWrite<u8, Control5>,
+    pub ed: ReadOnly<u8>,
+    pub modem: ReadWrite<u8>,
+    pub ir: ReadWrite<u8>, // 0x0E
+    _reserved0: ReadWrite<u8>,
+    pub pfifo: ReadWrite<u8>, // 0x10
+    pub cfifo: ReadWrite<u8>,
+    pub sfifo: ReadWrite<u8>,
+    pub twfifo: ReadWrite<u8>,
+    pub tcfifo: ReadOnly<u8>,
+    pub rwfifo: ReadWrite<u8>,
+    pub rcfifo: ReadOnly<u8>, // 0x16
+    _reserved1: ReadWrite<u8>,
+    pub c7816: ReadWrite<u8>, // 0x18
+    pub ie7816: ReadWrite<u8>,
+    pub is7816: ReadWrite<u8>,
+    pub wp7816: ReadWrite<u8>,
+    pub wn7816: ReadWrite<u8>,
+    pub wf7816: ReadWrite<u8>,
+    pub et7816: ReadWrite<u8>,
+    pub tl7816: ReadWrite<u8>, // 0x1F
+    _reserved2: [ReadWrite<u8>; 26],
+    pub ap7816a_t0: ReadWrite<u8>, // 0x3A
+    pub ap7816b_t0: ReadWrite<u8>,
+    pub wp7816a_t0_t1: ReadWrite<u8>,
+    pub wp7816b_t0_t1: ReadWrite<u8>,
+    pub wgp7816_t1: ReadWrite<u8>,
+    pub wp7816c_t1: ReadWrite<u8>,
 }
 
 pub const UART_BASE_ADDRS: [*mut Registers; 5] = [0x4006A000 as *mut Registers,

@@ -1,11 +1,11 @@
-use common::regs::RW;
+use common::regs::ReadWrite;
 
 pub const OSC: *mut Registers = 0x4006_5000 as *mut Registers;
 
 #[repr(C, packed)]
 pub struct Registers {
-    pub cr: RW<u8, Control>,
-    pub div: RW<u8, Divider>
+    pub cr: ReadWrite<u8, Control>,
+    pub div: ReadWrite<u8, Divider>
 }
 
 bitfields![u8,

@@ -1,19 +1,19 @@
-use common::regs::RW;
+use common::regs::ReadWrite;
 
 #[repr(C, packed)]
 pub struct Registers {
-    pub stctrlh: RW<u16, StatusAndControlHigh>,
-    pub stctrll: RW<u16>,
-    pub tovalh: RW<u16>,
-    pub tovall: RW<u16>,
-    pub winh: RW<u16>,
-    pub winl: RW<u16>,
-    pub refresh: RW<u16, Refresh>,
-    pub unlock: RW<u16, Unlock>,
-    pub tmrouth: RW<u16>,
-    pub tmroutl: RW<u16>,
-    pub rstcnt: RW<u16>,
-    pub presc: RW<u16>,
+    pub stctrlh: ReadWrite<u16, StatusAndControlHigh>,
+    pub stctrll: ReadWrite<u16>,
+    pub tovalh:  ReadWrite<u16>,
+    pub tovall:  ReadWrite<u16>,
+    pub winh:    ReadWrite<u16>,
+    pub winl:    ReadWrite<u16>,
+    pub refresh: ReadWrite<u16, Refresh>,
+    pub unlock:  ReadWrite<u16, Unlock>,
+    pub tmrouth: ReadWrite<u16>,
+    pub tmroutl: ReadWrite<u16>,
+    pub rstcnt:  ReadWrite<u16>,
+    pub presc:   ReadWrite<u16>,
 }
 
 pub const WDOG: *mut Registers = 0x40052000 as *mut Registers;

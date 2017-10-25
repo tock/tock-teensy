@@ -1,5 +1,4 @@
 //! Implementation of registers and bitfields
-//!
 
 #[macro_use]
 pub mod macros;
@@ -36,25 +35,25 @@ pub trait RegisterLongName {}
 
 impl RegisterLongName for () {}
 
-pub struct RW<T: IntLike, R: RegisterLongName=()> {
+pub struct ReadWrite<T: IntLike, R: RegisterLongName=()> {
     value: T,
     associated_register: PhantomData<R>
 }
 
-pub struct RO<T: IntLike, R: RegisterLongName=()> {
+pub struct ReadOnly<T: IntLike, R: RegisterLongName=()> {
     value: T,
     associated_register: PhantomData<R>
 }
 
-pub struct WO<T: IntLike, R: RegisterLongName=()> {
+pub struct WriteOnly<T: IntLike, R: RegisterLongName=()> {
     value: T,
     associated_register: PhantomData<R>
 }
 
 #[allow(dead_code)]
-impl<T: IntLike, R: RegisterLongName> RW<T, R> {
+impl<T: IntLike, R: RegisterLongName> ReadWrite<T, R> {
     pub const fn new(value: T) -> Self {
-        RW {
+        ReadWrite {
             value: value,
             associated_register: PhantomData
         }
@@ -99,9 +98,9 @@ impl<T: IntLike, R: RegisterLongName> RW<T, R> {
 }
 
 #[allow(dead_code)]
-impl<T: IntLike, R: RegisterLongName> RO<T, R> {
+impl<T: IntLike, R: RegisterLongName> ReadOnly<T, R> {
     pub const fn new(value: T) -> Self {
-        RO {
+        ReadOnly {
             value: value,
             associated_register: PhantomData
         }
@@ -130,9 +129,9 @@ impl<T: IntLike, R: RegisterLongName> RO<T, R> {
 }
 
 #[allow(dead_code)]
-impl<T: IntLike, R: RegisterLongName> WO<T, R> {
+impl<T: IntLike, R: RegisterLongName> WriteOnly<T, R> {
     pub const fn new(value: T) -> Self {
-        WO {
+        WriteOnly {
             value: value,
             associated_register: PhantomData
         }

@@ -1,29 +1,29 @@
-use common::regs::{RW, RO};
+use common::regs::{ReadWrite, ReadOnly};
 
 pub const MCG: *mut Registers = 0x4006_4000 as *mut Registers;
 
 #[repr(C, packed)]
 pub struct Registers {
-    pub c1: RW<u8, Control1>,
-    pub c2: RW<u8, Control2>,
-    pub c3: RW<u8>,
-    pub c4: RW<u8>,
-    pub c5: RW<u8, Control5>,
-    pub c6: RW<u8, Control6>,
-    pub s: RO<u8, Status>,
-    _reserved0: RO<u8>,
-    pub sc: RW<u8>,
-    _reserved1: RO<u8>,
-    pub atcvh: RW<u8>,
-    pub atcvl: RW<u8>,
-    pub c7: RW<u8>,
-    pub c8: RW<u8>,
-    pub c9: RW<u8>,
-    _reserved2: RO<u8>,
-    pub c11: RW<u8>,
-    pub c12: RW<u8>,
-    pub s2: RO<u8>,
-    pub t3: RW<u8>
+    pub c1: ReadWrite<u8, Control1>,
+    pub c2: ReadWrite<u8, Control2>,
+    pub c3: ReadWrite<u8>,
+    pub c4: ReadWrite<u8>,
+    pub c5: ReadWrite<u8, Control5>,
+    pub c6: ReadWrite<u8, Control6>,
+    pub s: ReadOnly<u8, Status>,
+    _reserved0: ReadOnly<u8>,
+    pub sc: ReadWrite<u8>,
+    _reserved1: ReadOnly<u8>,
+    pub atcvh: ReadWrite<u8>,
+    pub atcvl: ReadWrite<u8>,
+    pub c7: ReadWrite<u8>,
+    pub c8: ReadWrite<u8>,
+    pub c9: ReadWrite<u8>,
+    _reserved2: ReadOnly<u8>,
+    pub c11: ReadWrite<u8>,
+    pub c12: ReadWrite<u8>,
+    pub s2: ReadOnly<u8>,
+    pub t3: ReadWrite<u8>
 }
 
 bitfields![u8,
