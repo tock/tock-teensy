@@ -201,16 +201,16 @@ unsafe fn load_processes() -> &'static mut [Option<kernel::Process<'static>>] {
         static _sapps: u8;
     }
 
-    const NUM_PROCS: usize = 2;
+    const NUM_PROCS: usize = 1;
 
     // Total memory allocated to the processes
     #[link_section = ".app_memory"]
-    static mut APP_MEMORY: [u8; 16384] = [0; 16384];
+    static mut APP_MEMORY: [u8; 1 << 17] = [0; 1 << 17];
 
     // How the kernel responds when a process faults
     const FAULT_RESPONSE: kernel::process::FaultResponse = kernel::process::FaultResponse::Panic;
 
-    static mut PROCESSES: [Option<kernel::Process<'static>>; NUM_PROCS] = [None, None];
+    static mut PROCESSES: [Option<kernel::Process<'static>>; NUM_PROCS] = [None];
 
     // Create the processes and allocate the app memory among them
     let mut apps_in_flash_ptr = &_sapps as *const u8;
