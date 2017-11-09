@@ -7,7 +7,7 @@ use core::cell::Cell;
 use core::sync::atomic::Ordering;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT};
-use common::regs::{RW, WO, RO};
+use common::regs::{ReadWrite, WriteOnly, ReadOnly};
 use core::mem;
 use kernel::hil;
 use nvic::{self, NvicIdx};
@@ -16,15 +16,15 @@ use nvic::{self, NvicIdx};
 // [^1]: Section 12.5
 #[repr(C, packed)]
 pub struct PortRegisters {
-    pcr: [RW<u32, PinControl>; 32],
-    gpclr: WO<u32>,
-    gpchr: WO<u32>,
-    _reserved0: [RO<u32>; 6],
-    isfr: RW<u32>,
-    _reserved1: [RO<u32>; 7],
-    dfer: RW<u32>,
-    dfcr: RW<u32>,
-    dfwr: RW<u32>,
+    pcr: [ReadWrite<u32, PinControl>; 32],
+    gpclr: WriteOnly<u32>,
+    gpchr: WriteOnly<u32>,
+    _reserved0: [ReadOnly<u32>; 6],
+    isfr: ReadWrite<u32>,
+    _reserved1: [ReadOnly<u32>; 7],
+    dfer: ReadWrite<u32>,
+    dfcr: ReadWrite<u32>,
+    dfwr: ReadWrite<u32>,
 }
 
 bitfields! [ u32,
@@ -59,12 +59,12 @@ bitfields! [ u32,
 // [^1]: Section 63.3.1
 #[repr(C, packed)]
 pub struct GpioBitbandRegisters {
-    output: [RW<u32>; 32],
-    set: [RW<u32>; 32],
-    clear: [RW<u32>; 32],
-    toggle: [RW<u32>; 32],
-    input: [RW<u32>; 32],
-    direction: [RW<u32>; 32],
+    output: [ReadWrite<u32>; 32],
+    set: [ReadWrite<u32>; 32],
+    clear: [ReadWrite<u32>; 32],
+    toggle: [ReadWrite<u32>; 32],
+    input: [ReadWrite<u32>; 32],
+    direction: [ReadWrite<u32>; 32],
 }
 
 pub trait PinNum {

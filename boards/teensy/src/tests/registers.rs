@@ -1,9 +1,9 @@
 #[allow(unused)]
 
-use common::regs::RW;
+use common::regs::ReadWrite;
 
 struct Registers {
-    c1: RW<u8, Control>,
+    c1: ReadWrite<u8, Control>,
 }
 
 // Some made up register fields.
