@@ -19,10 +19,16 @@ use common::regs::{RO, RW, WO};
 #[repr(C, packed)]
 struct Registers {
     // Control register: read-write
-    cr: RW<u32>,
+    // The 'Control' parameter constrains this register to only use fields from
+    // a certain group (defined below in the bitfields section).
+    cr: RW<u8, Control>,
+
     // Status register: read-only
-    s: RO<u32>
+    s: RO<u8, Status>
+
     // Registers can be bytes, halfwords, or words:
+    // Note that the second type parameter can be omitted, meaning that there
+    // are no bitfields defined for these registers.
     byte0: RW<u8>,
     byte1: RW<u8>,
     short: RW<u16>,
@@ -42,13 +48,16 @@ bitfields! [
     // or u32.
     u8,
 
-    // Each subsequent parameter is a register name and its associated bitfields
-    CR [
+    // Each subsequent parameter is a register abbreviation, its descriptive
+    // name, and its associated bitfields.
+    // The descriptive name defines this 'group' of bitfields. Only registers
+    // defined as RW<_, Control> can use these bitfields.
+    CR Control [
         // Bitfields are defined as:
-        // name (mask, shift) [ /* optional named values */ ]
+        // name (Mask(mask), shift) [ /* optional named values */ ]
 
         // This is a two-bit field which includes bits 4 and 5
-        RANGE (0b11, 4) [
+        RANGE (Mask(0b11), 4) [
             // Each of these defines a name for a value that the bitfield can be 
             // written with or matched against. Note that this set is not exclusive--
             // the field can still be written with arbitrary constants.
@@ -66,18 +75,18 @@ bitfields! [
 
     // Without the explanatory comments like above, bitfield definition is quite compact:
     // Status register
-    S [
+    S Status [
         TXCOMPLETE 0 [],
         TXINTERRUPT 1 [],
         RXCOMPLETE 2 [],
         RXINTERRUPT 3 [],
-        MODE (0b11, 4) [
+        MODE (Mask(0b11), 4) [
             FullDuplex = 0,
             HalfDuplex = 1,
             Loopback = 2,
             Disabled = 3
         ],
-        ERRORCOUNT (0b11, 6) []
+        ERRORCOUNT (Mask(0b11), 6) []
     ]
 ]
 ```
@@ -178,23 +187,25 @@ down to the optimal inlined bit twiddling instructions--in other words, there is
 zero runtime cost, as far as my informal preliminary study has found. I will
 eventually be writing a more rigorous test to confirm this.
 
-## Gotchas
+## Nice type checking
 
-It's worth noting that bitfields are in no way type-constrained to only work on 
-a particular register. Any bitfield is valid for any `RW`, `RO`, or `WO`.
-While this provides a lot of desirable flexibility (eg. when a set of bitfields 
-applies to a group of registers), it's also something to watch out for:
+This interface helps the compiler catch some common types of bugs via type checking.
+
+If you define the bitfields for eg a control register, you can give them a
+descriptive group name like `Control`. This group of bitfields will only work with a 
+register of the type `RW<_, Control>` (or `RO/WO`, etc). For instance, if we have 
+the bitfields and registers as defined above,
 
 ```rust
-// Both of these operations are valid, even though EN is not a 
-// field in the status register S.
-let s_en  = regs.s.get(CR::EN);
-let cr_en = regs.cr.get(CR::EN);
+// This line compiles, because CR and regs.cr are both associated with the
+// Control group of bitfields.
+regs.cr.modify(CR::RANGE.val(1));
+
+// This line will not compile, because CR is associated with the Control group,
+// while regs.s is associated with the Status group.
+regs.s.modify(CR::RANGE.val(1));
+
 ```
-
-In this case, the fact that you're accessing `regs.s` should be an indicator 
-that `CR::` is the wrong namespace, and instead you should be using fields under `S::`.
-
 
 ## Usage in Tock Teensy port
 

@@ -4,7 +4,6 @@ use kernel::ReturnCode;
 use kernel::common::take_cell::TakeCell;
 use core::cell::Cell;
 use core::mem;
-use sim;
 use clock;
 use nvic::{self, NvicIdx};
 
@@ -71,7 +70,13 @@ impl<'a> Spi<'a> {
     }
 
     fn enable_clock(&self) {
-        sim::enable_clock(sim::clocks::SPI[self.index]);
+        use sim::{clocks, Clock};
+        match self.index {
+            0 => clocks::SPI0.enable(),
+            1 => clocks::SPI1.enable(),
+            2 => clocks::SPI2.enable(),
+            _ => unreachable!()
+        };
     }
 
     fn set_client(&self, client: &'a SpiMasterClient) {
