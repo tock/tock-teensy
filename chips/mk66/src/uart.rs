@@ -42,7 +42,7 @@ impl Uart {
         let mut index = self.rx_index.get();
         if regs.s1.is_set(S1::RDRF) {
             let datum: u8 = regs.d.get();
-            self.send_byte(datum);
+            self.send_byte(datum); // TODO: remove this simple loopback
             let mut done = false;
             self.buffer.map( |buf| {
                 buf[index] = datum;
