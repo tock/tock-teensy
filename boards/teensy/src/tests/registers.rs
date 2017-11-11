@@ -1,22 +1,22 @@
 #[allow(unused)]
 
-use common::regs::RW;
+use common::regs::ReadWrite;
 
 struct Registers {
-    c1: RW<u8, Control>,
+    c1: ReadWrite<u8, Control>,
 }
 
 // Some made up register fields.
 bitfields! { u8,
     C1 Control [
-        CLKS  (Mask(0b11), 6) [],
-        PRDIV (Mask(0b11), 4) [
+        CLKS  (6, Mask(0b11)) [],
+        PRDIV (4, Mask(0b11)) [
             Div32 = 2
         ]
     ]
 }
 
-static mut BASE: *mut Registers = 0x2000_0000 as *mut Registers;
+const BASE: *mut Registers = 0x2000_0000 as *mut Registers; 
 
 #[inline(never)]
 pub fn register_test() {
