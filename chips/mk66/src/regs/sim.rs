@@ -72,7 +72,7 @@ bitfields![u32,
         EWM 1
     ],
     SCGC5 SystemClockGatingControl5 [
-        PORT (Mask(0b11111), 9) [
+        PORT (9, Mask(0b11111)) [
             All = 0b11111,
             A = 0b1,
             B = 0b10,
@@ -109,9 +109,9 @@ bitfields![u32,
         FLEXBUS 0
     ],
     CLKDIV1 ClockDivider1 [
-        Core (Mask(0b1111), 28) [],
-        Bus (Mask(0b1111), 24) [],
-        FlexBus (Mask(0b1111), 20) [],
-        Flash (Mask(0b1111), 16) []
+        Core (28, Mask(0b1111)) [],
+        Bus (24, Mask(0b1111)) [],
+        FlexBus (20, Mask(0b1111)) [],
+        Flash (16, Mask(0b1111)) []
     ]
 ];

@@ -28,12 +28,12 @@ pub struct Registers {
 
 bitfields![u8,
     C1 Control1 [
-        CLKS (Mask(0b11), 6) [
+        CLKS (6, Mask(0b11)) [
             LockedLoop = 0,
             Internal = 1,
             External = 2
         ],
-        FRDIV (Mask(0b11), 4) [
+        FRDIV (4, Mask(0b11)) [
             Low1_High32 = 0,
             Low2_High64 = 1,
             Low4_High128 = 2,
@@ -60,7 +60,7 @@ bitfields![u8,
     C2 Control2 [
         LOCKRE0 7 [],
         FCFTRIM 6 [],
-        RANGE (Mask(0b11), 4) [
+        RANGE (4, Mask(0b11)) [
             Low = 0,
             High = 1,
             VeryHigh = 2
@@ -83,7 +83,7 @@ bitfields![u8,
     C5 Control5 [
         PLLCLKEN 6 [],
         PLLSTEN 5 [],
-        PRDIV (Mask(0b111), 0) [
+        PRDIV (0, Mask(0b111)) [
             Div1 = 0, Div2 = 1, Div3 = 2, Div4 = 3,
             Div5 = 4, Div6 = 5, Div7 = 6, Div8 = 7
         ]
@@ -96,7 +96,7 @@ bitfields![u8,
             PllcsOutput = 1
         ],
         CME0 5 [],
-        VDIV (Mask(0b11111), 0) [
+        VDIV (0, Mask(0b11111)) [
             Mul16 = 0, Mul17 = 1, Mul18 = 2, Mul19 = 3,
             Mul20 = 4, Mul21 = 5, Mul22 = 6, Mul23 = 7,
             Mul24 = 8, Mul25 = 9, Mul26 = 10, Mul27 = 11,
@@ -119,7 +119,7 @@ bitfields![u8,
             External = 0,
             Internal = 1
         ],
-        CLKST (Mask(0b11), 2) [
+        CLKST (2, Mask(0b11)) [
             Fll = 0,
             Internal = 1,
             External = 2,

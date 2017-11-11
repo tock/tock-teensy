@@ -40,7 +40,7 @@ bitfields![ u32,
             IgnoreOverflow = 0,
             ShiftOverflow = 1
         ],
-        PCSIS (Mask(0b11_1111), 16) [
+        PCSIS (16, Mask(0b11_1111)) [
             AllInactiveHigh = 0x3F,
             AllInactiveLow = 0x0
         ],
@@ -50,7 +50,7 @@ bitfields![ u32,
         DIS_RXF 12 [],
         CLR_TXF 11 [],
         CLR_RXF 10 [],
-        SMPL_PT (Mask(0b11), 8) [
+        SMPL_PT (8, Mask(0b11)) [
             ZeroCycles = 0,
             OneCycle = 1,
             TwoCycles = 2
@@ -59,12 +59,12 @@ bitfields![ u32,
     ],
 
     TCR TransferCount [
-        SPI_TCNT (Mask(0xFFFF), 16) []
+        SPI_TCNT (16, Mask(0xFFFF)) []
     ],
 
     CTAR ClockAndTransferAttributes [
         DBR 31 [],
-        FMSZ (Mask(0xF), 27) [],
+        FMSZ (27, Mask(0xF)) [],
         CPOL 26 [
             IdleLow = 0,
             IdleHigh = 1
@@ -77,31 +77,31 @@ bitfields![ u32,
             MsbFirst = 0,
             LsbFirst = 1
         ],
-        PCSSCK (Mask(0b11), 22) [
+        PCSSCK (22, Mask(0b11)) [
             Prescaler1 = 0,
             Prescaler3 = 1,
             Prescaler5 = 2,
             Prescaler7 = 3
         ],
-        PASC (Mask(0b11), 20) [
+        PASC (20, Mask(0b11)) [
             Delay1 = 0,
             Delay3 = 1,
             Delay5 = 2,
             Delay7 = 3
         ],
-        PDT (Mask(0b11), 18) [
+        PDT (18, Mask(0b11)) [
             Delay1 = 0,
             Delay3 = 1,
             Delay5 = 2,
             Delay7 = 3
         ],
-        PBR (Mask(0b11), 16) [
+        PBR (16, Mask(0b11)) [
             BaudRatePrescaler2 = 0,
             BaudRatePrescaler3 = 1,
             BaudRatePrescaler5 = 2,
             BaudRatePrescaler7 = 3
         ],
-        CSSCK (Mask(0b1111), 12) [
+        CSSCK (12, Mask(0b1111)) [
             DelayScaler2 = 0x0,
             DelayScaler4 = 0x1,
             DelayScaler8 = 0x2,
@@ -119,9 +119,9 @@ bitfields![ u32,
             DelayScaler32768 = 0xE,
             DelayScaler65536 = 0xF
         ],
-        ASC (Mask(0b1111), 8) [],
-        DT (Mask(0b1111), 4) [],
-        BR (Mask(0b1111), 0) [
+        ASC (8, Mask(0b1111)) [],
+        DT (4, Mask(0b1111)) [],
+        BR (0, Mask(0b1111)) [
             BaudRateScaler2 = 0x0,
             BaudRateScaler4 = 0x1,
             BaudRateScaler8 = 0x2,
@@ -142,7 +142,7 @@ bitfields![ u32,
     ],
 
     CTAR_SLAVE ClockAndTransferAttributesSlave [
-        FMSZ (Mask(0xF), 27) [],
+        FMSZ (27, Mask(0xF)) [],
         CPOL 26 [
             IdleLow = 0,
             IdleHigh = 1
@@ -161,10 +161,10 @@ bitfields![ u32,
         TFFF 25 [],
         RFOF 19 [],
         RFDF 17 [],
-        TXCTR (Mask(0xF), 12) [],
-        TXNXTPTR (Mask(0xF), 8) [],
-        RXCTR (Mask(0xF), 4) [],
-        POPNXTPTR (Mask(0xF), 0) []
+        TXCTR (12, Mask(0xF)) [],
+        TXNXTPTR (8, Mask(0xF)) [],
+        RXCTR (4, Mask(0xF)) [],
+        POPNXTPTR (0, Mask(0xF)) []
     ],
 
     RSER RequestSelectAndEnable [
@@ -191,12 +191,12 @@ bitfields![ u16,
             ChipSelectInactiveBetweenTxfers = 0,
             ChipSelectAssertedBetweenTxfers = 1
         ],
-        CTAS (Mask(0b111), 12) [
+        CTAS (12, Mask(0b111)) [
             Ctar0 = 0,
             Ctar1 = 1
         ],
         EOQ 11 [],
         CTCNT 10 [],
-        PCS (Mask(0b111111), 0) []
+        PCS (0, Mask(0b111111)) []
     ]
 ];
