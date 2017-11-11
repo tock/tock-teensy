@@ -42,6 +42,9 @@ impl Uart {
         if regs.s1.is_set(S1::RDRF) {
             let datum: u8 = regs.d.get();
             self.send_byte(datum); // TODO: remove this simple loopback
+
+        }
+        /*
             let mut done = false;
             self.buffer.map( |buf| {
                 buf[index] = datum;
@@ -58,7 +61,7 @@ impl Uart {
                     }
                 });
             }
-        }
+        }*/
     }
 
     pub fn handle_error(&self) {
@@ -123,7 +126,7 @@ impl Uart {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
         regs.c5.modify(C5::RDMAS::CLEAR); // Issue interrupt on RX data
         regs.rwfifo.set(0);            // Issue interrupt on each byte
-        regs.c2.modify(C2::RIE::SET);     // Enable interrupts
+        //regs.c2.modify(C2::RIE::SET);     // Enable interrupts
     }
 
     pub fn enable_tx(&self) {
@@ -183,7 +186,7 @@ impl hil::uart::UART for Uart {
 
         while !self.tx_ready() {}
 
-        self.client.get().map(move |client| 
+        self.client.get().map(move |client|
             client.transmit_complete(tx_data, uart::Error::CommandComplete)
         );
     }

@@ -187,6 +187,11 @@ pub unsafe fn reset_handler() {
     };
 
     let mut chip = mk66::chip::MK66::new();
+    debug!("Booting Tock on Teensy.");
+    uart::UART0.enable_rx();
+    debug!("Enabled UART reception.");
+    uart::UART0.enable_rx_interrupts();
+    debug!("Enabled UART interrupts.");
 
     if tests::TEST {
         tests::test();
