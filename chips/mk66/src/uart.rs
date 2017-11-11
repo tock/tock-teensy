@@ -119,19 +119,20 @@ impl Uart {
 
     pub fn enable_rx(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c2.write(C2::RE::SET);
+        regs.c1.modify(C1::ILT::SET); // Idle after stop bit
+        regs.c2.modify(C2::RE::SET);  // Enable UART reception
     }
 
     pub fn enable_rx_interrupts(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
         regs.c5.modify(C5::RDMAS::CLEAR); // Issue interrupt on RX data
-        regs.rwfifo.set(0);            // Issue interrupt on each byte
+        regs.rwfifo.set(1);            // Issue interrupt on each byte
         //regs.c2.modify(C2::RIE::SET);     // Enable interrupts
     }
 
     pub fn enable_tx(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c2.write(C2::TE::SET);
+        regs.c2.modify(C2::TE::SET);
     }
 
     fn enable_clock(&self) {
