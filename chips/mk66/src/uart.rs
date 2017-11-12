@@ -125,8 +125,8 @@ impl Uart {
 
     pub fn enable_rx_interrupts(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c5.modify(C5::RDMAS::CLEAR); // Issue interrupt on RX data
         regs.rwfifo.set(1);            // Issue interrupt on each byte
+        regs.c5.modify(C5::RDMAS::CLEAR); // Issue interrupt on RX data
         //regs.c2.modify(C2::RIE::SET);     // Enable interrupts
     }
 

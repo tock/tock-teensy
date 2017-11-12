@@ -102,7 +102,7 @@ int main(void) {
         delay_ms(20);
         set_pixel(which, color(0, 0, 0));
         which = which + dir;
-        set_pixel(which, color(255, 255, 255));
+        set_pixel(which, color(32, 32, 32));
         if (which == NUM_PIXELS) {
            dir = -1;
         } else if (which == 0) {
