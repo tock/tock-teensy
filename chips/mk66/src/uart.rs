@@ -8,6 +8,7 @@ use core::mem;
 use nvic;
 use regs::uart::*;
 use clock;
+use gpio;
 
 pub struct Uart {
     index: usize,
@@ -41,7 +42,11 @@ impl Uart {
         let mut index = self.rx_index.get();
         if regs.s1.is_set(S1::RDRF) {
             let datum: u8 = regs.d.get();
-            self.send_byte(datum); // TODO: remove this simple loopback
+
+unsafe {
+    gpio::PC05.claim_as_gpio().toggle();
+}
+            //self.send_byte(datum); // TODO: remove this simple loopback
 
         }
         /*
@@ -124,10 +129,19 @@ impl Uart {
     }
 
     pub fn enable_rx_interrupts(&self) {
+        //unsafe {gpio::PC05.claim_as_gpio().toggle();}
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
         regs.rwfifo.set(1);            // Issue interrupt on each byte
         regs.c5.modify(C5::RDMAS::CLEAR); // Issue interrupt on RX data
-        //regs.c2.modify(C2::RIE::SET);     // Enable interrupts
+        match self.index {
+            0 => unsafe {nvic::enable(nvic::NvicIdx::UART0)},
+            1 => unsafe {nvic::enable(nvic::NvicIdx::UART1)},
+            2 => unsafe {nvic::enable(nvic::NvicIdx::UART2)},
+            3 => unsafe {nvic::enable(nvic::NvicIdx::UART3)},
+            4 => unsafe {nvic::enable(nvic::NvicIdx::UART4)},
+            _ => unreachable!()
+        };
+        regs.c2.modify(C2::RIE::SET);     // Enable interrupts
     }
 
     pub fn enable_tx(&self) {
