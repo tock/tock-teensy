@@ -104,6 +104,7 @@ pub unsafe fn reset_handler() {
             Console::new(&uart::UART0,
                          115200,
                          &mut capsules::console::WRITE_BUF,
+                         &mut capsules::console::READ_BUF,
                          kernel::Container::create())
         );
     uart::UART0.set_client(console);
@@ -196,7 +197,6 @@ pub unsafe fn reset_handler() {
     if tests::TEST {
         tests::test();
     }
-
     kernel::main(&teensy, &mut chip, load_processes(), &teensy.ipc);
 }
 

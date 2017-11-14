@@ -8,7 +8,6 @@ use core::mem;
 use nvic;
 use regs::uart::*;
 use clock;
-use gpio;
 
 pub struct Uart {
     index: usize,
@@ -39,24 +38,20 @@ impl Uart {
 
     pub fn handle_interrupt(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        let mut index = self.rx_index.get();
+        // Read byte from data register; reading S1 and D clears interrupt
         if regs.s1.is_set(S1::RDRF) {
             let datum: u8 = regs.d.get();
 
-unsafe {
-    gpio::PC05.claim_as_gpio().toggle();
-}
-            //self.send_byte(datum); // TODO: remove this simple loopback
-
-        }
-        /*
+            // Put byte into buffer, trigger callback if buffer full
             let mut done = false;
+            let mut index = self.rx_index.get();
             self.buffer.map( |buf| {
                 buf[index] = datum;
                 index = index + 1;
                 if index >= self.rx_len.get() {
-                   done = true;
+                    done = true;
                 }
+                self.rx_index.set(index);
             });
             if done {
                 self.client.get().map(|client| {
@@ -66,7 +61,7 @@ unsafe {
                     }
                 });
             }
-        }*/
+        }
     }
 
     pub fn handle_error(&self) {
@@ -129,10 +124,10 @@ unsafe {
     }
 
     pub fn enable_rx_interrupts(&self) {
-        //unsafe {gpio::PC05.claim_as_gpio().toggle();}
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.rwfifo.set(1);            // Issue interrupt on each byte
+        regs.rwfifo.set(1);               // Issue interrupt on each byte
         regs.c5.modify(C5::RDMAS::CLEAR); // Issue interrupt on RX data
+
         match self.index {
             0 => unsafe {nvic::enable(nvic::NvicIdx::UART0)},
             1 => unsafe {nvic::enable(nvic::NvicIdx::UART1)},
@@ -213,8 +208,6 @@ impl hil::uart::UART for Uart {
             length = rx_buffer.len();
         }
 
-        self.enable_rx();
-        self.enable_rx_interrupts();
         self.buffer.put(Some(rx_buffer));
         self.rx_len.set(length);
         self.rx_index.set(0);

@@ -1,6 +1,6 @@
 #![crate_name = "mk66"]
 #![crate_type = "rlib"]
-#![feature(asm,core_intrinsics,concat_idents,const_fn,associated_consts,const_cell_new)]
+#![feature(asm,core_intrinsics,concat_idents,const_fn,associated_consts)]
 #![no_std]
 
 extern crate cortexm4;
@@ -131,8 +131,7 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 100] = [
     /* _RESERVED0 */    Option::Some(unhandled_interrupt),
     /* UART0 */         Option::Some(uart::uart0_handler),
     /* UART0_ERR */     Option::Some(unhandled_interrupt),
-//    /* UART1 */         Option::Some(uart::uart1_handler),
-    /* UART1 */         Option::Some(unhandled_interrupt),
+    /* UART1 */         Option::Some(uart::uart1_handler),
     /* UART1_ERR */     Option::Some(unhandled_interrupt),
     /* UART2 */         Option::Some(unhandled_interrupt),
     /* UART2_ERR */     Option::Some(unhandled_interrupt),

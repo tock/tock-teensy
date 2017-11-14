@@ -4,6 +4,7 @@ use nvic;
 use pit;
 use spi;
 use gpio;
+use uart;
 
 pub struct MK66 {
     pub mpu: (),
@@ -36,7 +37,6 @@ impl Chip for MK66 {
 
     fn service_pending_interrupts(&mut self) {
         use nvic::NvicIdx::*;
-
         unsafe {
             let iq = INTERRUPT_QUEUE.as_mut().unwrap();
             while let Some(interrupt) = iq.dequeue() {
@@ -50,6 +50,8 @@ impl Chip for MK66 {
                     SPI0 => spi::SPI0.handle_interrupt(),
                     SPI1 => spi::SPI1.handle_interrupt(),
                     SPI2 => spi::SPI2.handle_interrupt(),
+                    UART0 => uart::UART0.handle_interrupt(),
+                    UART1 => uart::UART1.handle_interrupt(),
                     _ => {}
                 }
 
