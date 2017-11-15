@@ -1,9 +1,5 @@
 #include <tock.h>
 
-int serial_read_once(char* buf, size_t len);
-int serial_read(char* buf, size_t len);
-int serial_write(char* buf, size_t len);
-
 // Set the buffer that xmodem should fill with a transfer.
 void xmodem_set_buffer(char* buf, size_t len);
 
@@ -14,9 +10,27 @@ void xmodem_set_buffer(char* buf, size_t len);
 typedef void xmodem_cb(char* buf, int len, int error);
 void xmodem_set_callback(xmodem_cb buffer_filled);
 
+
+typedef enum {
+  STOP,
+  NEW_BLOCK,
+  BLOCK_NUMBER,
+  BLOCK_INVERSE,
+  DATA,
+  CHECKSUM
+} xmodem_state_t;
+
+static xmodem_state_t xmodem_state = STOP;
+static uint8_t xmodem_write_busy = false;
+static const uint32_t XMODEM_TIMEOUT = 4000;
+static uint8_t xmodem_byte_count;
+static uint8_t xmodem_recv;
+static uint8_t xmodem_send;
+static uint8_t xmodem_block_number;
+static uint8_t xmodem_checksum;
+static tock_timer_t xmodem_timer;
 static char* xmodem_buf = NULL;
 static size_t xmodem_buf_len = 0;
-static uint8_t xmodem_blockno = 0;
 static xmodem_cb xmodem_callback = NULL;
 
 void xmodem_set_buffer(char* buf, size_t len) {
@@ -39,138 +53,150 @@ enum {
         ARMBASE = 0x8000
 };
 
-// Performs a single UART read into buf. This read may
-// read fewer than len bytes.
-int serial_read_once(char* buf, size_t len) {
-  int read_len = 0;
-  void read_callback(int rlen,
-                     __attribute__ ((unused)) int unused1,
-                     __attribute__ ((unused)) int unused2,
-                     void* ud) {
-    *((bool*)ud) = true;
-    read_len = rlen;
-  }
-
-  int ret = allow(0, 0, buf, len);
-  bool done = false;
-  if (ret < 0)  return ret;
-  ret = subscribe(0, 0, read_callback, &done);
-  if (ret < 0)  return ret;
-  ret = command(0, 2, len);
-  if (ret < 0)  return ret;
-  yield_for(&done);
-  return read_len;
-}
-
-// Reads until buf is filled with len bytes.
-int serial_read(char* buf, size_t len) {
-  size_t index;
-  for (index = 0; index < len;) {
-    size_t left = len - index;
-    size_t count = serial_read_once(buf + index, left);
-    index += count;
-  }
-  return (int)index;
-}
-
-int serial_write(char* buf, size_t len) {
-  int write_len = 0;
-  void write_callback(int wlen,
-                     __attribute__ ((unused)) int unused1,
-                     __attribute__ ((unused)) int unused2,
-                     void* ud) {
-    *((bool*)ud) = true;
-    write_len = wlen;
-  }
-  bool done = false;
-
-  int ret = allow(0, 1, buf, len);
-  if (ret < 0) return ret;
-
-  ret = subscribe(0, 1, write_callback, &done);
-  if (ret < 0) return ret;
-
-  ret = command(0, 1, len);
   yield_for(&done);
   return write_len;
 }
 
-// There need to be allocated not on the stack in case both
-// the read and the timeout callbacks are enqueued. If the read
-// is enqueued first, then the function will exit, and the timer
-// callback might later write on a defunct stack frame. The worst
-// case is that it's triggered on the next call to yield_for in
-// this function, at which point it'll seem like the timer fired
-// immediately. All this will do is produce a NACK.
-//  -pal
-bool byte_read = false;
-bool timeout = false;
-static unsigned char serial_read_byte_timeout(uint32_t timeout) {
-  byte_read = false;
-  timeout = false;
-  bool done = false;
-  uint8_t byte = 0;
-  tock_timer_t timer;
-  void read_callback(int rlen,
-                      __attribute__ ((unused)) int unused1,
-                      __attribute__ ((unused)) int unused2,
-                     void* ud) {
-    done = true;
-    if (rlen == 1) {
-      byte_read = true;
-    }
-  }
-  void timer_callback(int wlen,
-                      __attribute__ ((unused)) int unused1,
-                      __attribute__ ((unused)) int unused2,
-                     void* ud) {
-    done = true;
-    timeout = true;
-  }
-  while (byte_read == false) {
-    timer_in(timeout, timer_callback, NULL, &timer);
-
-    int ret = allow(0, 0, &byte, sizeof(uint8_t));
-    bool done = false;
-    if (ret < 0)  return ret;
-    ret = subscribe(0, 0, read_callback, &done);
-    if (ret < 0)  return ret;
-    ret = command(0, 2, sizeof(uint8_t));
-    if (ret < 0)  return ret;
-
-    yield_for(&done);
-
-    if (byte_read) {
-      timer_cancel(&timer);
-      return byte;
-    }
-    uint8_t nack = NAK;
-    serial_write(&nack, 1);
-  }
-
-  return read_len;
+void xmodem_restart_transfer() {
+  xmodem_state = NEW_BLOCK;
+  xmodem_write(NAK);
+  xmodem_block_number = 1;
+  xmodem_byte_count = 0;
+  xmodem_checksum = 0;
 }
 
-// Reads until buf is filled with len bytes.
-int serial_read(char* buf, size_t len) {
-  size_t index;
-  for (index = 0; index < len;) {
-    size_t left = len - index;
-    size_t count = serial_read_once(buf + index, left);
-    index += count;
-  }
-  yield_for(&done);
+void xmodem_restart_block() {
+  xmodem_state = NEW_BLOCK;
+  xmodem_write(NAK);
+  xmodem_checksum = 0;
+}
 
-  unsigned t0 = timer_tick();
-        // while uart not ready, just keep going; nak every 4 sec
-        while(((uart_lcr() & 0x01) == 0)) {
-                unsigned t = timer_tick();
-                if ((t - t0) >= 4000000) {
-                        uart_send(NAK);
-                        t0 = t;
-                }
-        }
-        return uart_recv();
+void xmodem_read_callback(int rlen,
+                          __attribute__ ((unused)) int unused1,
+                          __attribute__ ((unused)) int unused2,
+                          void* ud) {
+  // Restart the NAK read timeout
+  timer_cancel(&xmodem_timer);
+  timer_in(TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
+
+  switch (xmodem_state) {
+  case NEW_BLOCK:
+    switch (xmodem_recv) {
+    case EOT:
+      xmodem_write(ACK);
+      if (xmodem_callback != NULL) {
+        uint32_t size = (xmodem_block_number - 1) * PAYLOAD_SIZE ;
+        xmodem_callback(xmodem_buffer, size, 0);
+      }
+      break;
+    case SOH:
+      xmodem_state = BLOCK_NUMBER;
+      break;
+    default:
+      xmodem_restart_block();
+      break;
+    }
+    break;
+  }
+  case BLOCK_NUMBER:
+    if (xmodem_recv == xmodem_block) {
+      xmodem_state = BLOCK_INVERSE;
+    } else { // Go back to beginning of block
+      xmodem_restart_block();
+    }
+    break;
+  case BLOCK_INVERSE:
+    if (xmodem_recv == (0xff - block)) {
+      xmodem_state = DATA;
+      xmodem_byte_count = 0;
+    } else { // Go back to beginning of block
+      xmodem_restart_block();
+    }
+  case DATA:
+    uint32_t pos = ((xmodem_block_number - 1) * PAYLOAD_SIZE);
+    pos += xmodem_byte_count;
+
+    if (pos >= xmodem_buf_len) {     // Wrote past end of buffer -- abort
+      xmodem_restart_transfer();
+      xmodem_callback(xmodem_buffer, 0, -1);
+    } else {
+      xmodem_buf[pos] = xmodem_recv;
+      xmodem_checksum += xmodem_recv;
+      xmodem_byte_count++;
+      // Completed the block
+      if (xmodem_byte_count == PAYLOAD_SIZE) {
+        xmodem_state = CHECKSUM;
+      }
+    }
+    break;
+  case CHECKSUM:
+    if (xmodem_recv != xmodem_checksum) {
+      xmodem_restart_block();
+    } else {
+      xmodem_write(ACK);
+      block++;
+    }
+    break;
+ default:
+   // Should never happen
+   break;
+}
+
+void xmodem_write_callback(int rlen,
+                           __attribute__ ((unused)) int unused1,
+                           __attribute__ ((unused)) int unused2,
+                           void* ud) {
+  xmodem_write_busy = false;
+}
+
+void xmodem_timer_callback(int wlen,
+                           __attribute__ ((unused)) int unused1,
+                           __attribute__ ((unused)) int unused2,
+                           void* ud) {
+  xmodem_write(NAK);
+  timer_in(TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
+}
+
+
+
+// Non-blocking write, just issues the command, protected by a
+// busy flag so a write doesn't occur while one is pending.
+int xmodem_write(uint8_t byte) {
+  if (write_busy == false) {
+    send = byte;
+    int ret = command(0, 1, len);
+    if (ret == 0) {
+      write_busy = true;
+      return 0;
+    } else {
+      return -1;
+    }
+  } else {
+    return -1;
+  }
+}
+
+int xmodem_init() {
+  xmodem_state = NEW_BLOCK;
+  xmodem_block_number = 1;
+  xmodem_byte_count = 0;
+
+  // Start reading
+  int ret = allow(0, 0, &recv, sizeof(uint8_t));
+  if (ret < 0)  return ret;
+  ret = subscribe(0, 0, xmodem_read_callback, NULL);
+  if (ret < 0)  return ret;
+  ret = command(0, 2, sizeof(uint8_t));
+  if (ret < 0)  return ret;
+
+  // Setup writes but no writes yet
+  int ret = allow(0, 1, &send, sizeof(uint8_t));
+  if (ret < 0) return ret;
+  ret = subscribe(0, 1, xmodem_write_callback, NULL);
+  if (ret < 0) return ret;
+
+  // Set the timeout
+  timer_in(TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
 }
 
 void notmain ( void ) {

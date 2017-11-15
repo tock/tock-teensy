@@ -22,17 +22,16 @@ mod tests;
 
 use capsules::timer::TimerDriver;
 use capsules::spi::Spi;
-use capsules::console::Console;
 use capsules::gpio::GPIO;
 use capsules::led::{ActivationMode, LED};
 use capsules::virtual_spi::{VirtualSpiMasterDevice, MuxSpiMaster};
 use kernel::hil::spi::SpiMaster;
 use kernel::hil::uart::UART;
-
+pub mod xconsole;
 
 #[allow(unused)]
 struct Teensy {
-    console: &'static Console<'static, mk66::uart::Uart>,
+    xconsole: &'static xconsole::XConsole<'static, mk66::uart::Uart>,
     gpio: &'static GPIO<'static, mk66::gpio::Gpio<'static>>,
     led: &'static LED<'static, mk66::gpio::Gpio<'static>>,
     timer: &'static TimerDriver<'static, mk66::pit::Pit<'static>>,
@@ -45,7 +44,7 @@ impl kernel::Platform for Teensy {
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
         match driver_num {
-            0 => f(Some(self.console)),
+            0 => f(Some(self.xconsole)),
             1 => f(Some(self.gpio)),
 
             3 => f(Some(self.timer)),
@@ -99,22 +98,22 @@ pub unsafe fn reset_handler() {
 
     set_pin_primary_functions();
 
-    let console = static_init!(
-            Console<uart::Uart>,
-            Console::new(&uart::UART0,
-                         115200,
-                         &mut capsules::console::WRITE_BUF,
-                         &mut capsules::console::READ_BUF,
-                         kernel::Container::create())
-        );
-    uart::UART0.set_client(console);
-    console.initialize();
+    let xconsole = static_init!(
+            xconsole::XConsole<uart::Uart>,
+            xconsole::XConsole::new(&uart::UART0,
+                                    115200,
+                                    &mut xconsole::WRITE_BUF,
+                                    &mut xconsole::READ_BUF,
+                                    kernel::Container::create())
+    );
+    uart::UART0.set_client(xconsole);
+    xconsole.initialize();
 
     let kc = static_init!(
-            capsules::console::App,
-            capsules::console::App::default()
+            xconsole::App,
+            xconsole::App::default()
         );
-    kernel::debug::assign_console_driver(Some(console), kc);
+    kernel::debug::assign_console_driver(Some(xconsole), kc);
 
     let timer = static_init!(
             TimerDriver<'static, mk66::pit::Pit>,
@@ -179,7 +178,7 @@ pub unsafe fn reset_handler() {
         );
 
     let teensy = Teensy {
-        console: console,
+        xconsole: xconsole,
         gpio: gpio,
         led: led,
         timer: timer,
