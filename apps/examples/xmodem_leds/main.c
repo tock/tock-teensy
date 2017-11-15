@@ -6,6 +6,7 @@
 #include <spi.h>
 
 #include <stdint.h>
+#include "xmodem.h"
 
 #define NUM_PIXELS 150
 #define PIXEL_BUFFER_SIZE ((NUM_PIXELS*4) + 8)
@@ -15,6 +16,8 @@ static char rbuf[PIXEL_BUFFER_SIZE];
 static uint32_t RED_OFFSET = 3;
 static uint32_t GREEN_OFFSET = 2;
 static uint32_t BLUE_OFFSET = 1;
+
+void xmodem_callback(char* buf, int len, int error);
 
 static void initialize_strip(void) {
     spi_set_chip_select(0);
@@ -72,13 +75,10 @@ static void update_strip(void) {
     spi_read_write(pixels, rbuf, PIXEL_BUFFER_SIZE, write_cb, NULL);
 }
 
-int xmodem_init(void);
-void xmodem_set_buffer(char* buf, size_t len);
-typedef void xmodem_cb(char* buf, int len, int error);
-void xmodem_set_callback(xmodem_cb buffer_filled);
-
 bool update = false;
-void xmodem_callback(char* buf, int len, int error) {
+void xmodem_callback(__attribute__ ((unused)) char* buf, 
+		     __attribute__ ((unused)) int len, 
+		     __attribute__ ((unused)) int error) {
     update = true;
 }
 

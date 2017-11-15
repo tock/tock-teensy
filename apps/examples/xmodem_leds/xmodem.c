@@ -94,8 +94,10 @@ void xmodem_read_callback(__attribute__ ((unused)) int unused0,
   timer_cancel(&xmodem_timer);
   timer_in(XMODEM_TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
   // issue another read
-  command(0, 2, sizeof(uint8_t));
-
+  int ret = command(0, 2, sizeof(uint8_t));
+  if (ret < 0 ) {
+    xmodem_restart_transfer();
+  } 
   switch (xmodem_state) {
   case NEW_BLOCK:
     switch (xmodem_recv) {
@@ -139,7 +141,9 @@ void xmodem_read_callback(__attribute__ ((unused)) int unused0,
       xmodem_restart_transfer();
       xmodem_callback(xmodem_buffer, 0, -1);
     } else {
-      xmodem_buffer[pos] = xmodem_recv;
+      if (xmodem_buffer != NULL) {
+          xmodem_buffer[pos] = xmodem_recv;
+      }
       xmodem_checksum += xmodem_recv;
       xmodem_byte_count++;
       // Completed the block
@@ -177,7 +181,7 @@ void xmodem_timer_callback(__attribute__ ((unused)) int unused0,
                            __attribute__ ((unused)) int unused1,
                            __attribute__ ((unused)) int unused2,
                            __attribute__ ((unused)) void* ud) {
-  int ret = xmodem_write(NAK);
+  xmodem_write(NAK);
   timer_in(XMODEM_TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
 }
 

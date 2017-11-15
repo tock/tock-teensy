@@ -348,6 +348,10 @@ impl<'a, U: UART> Client for XConsole<'a, U> {
         }
     }
 
+    // We don't use the return value of apps.enter since we should
+    // just fail silently and return to an idle state if the app has
+    // died.
+    #[allow(unused)]
     fn receive_complete(&self,
                         _rx_buffer: &'static mut [u8],
                         _rx_len: usize,
