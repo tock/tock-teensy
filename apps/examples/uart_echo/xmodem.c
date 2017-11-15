@@ -1,8 +1,29 @@
 #include <tock.h>
 
-int serial_read_short(char* buf, size_t len);
+int serial_read_once(char* buf, size_t len);
 int serial_read(char* buf, size_t len);
 int serial_write(char* buf, size_t len);
+
+// Set the buffer that xmodem should fill with a transfer.
+void xmodem_set_buffer(char* buf, size_t len);
+
+// The callback that indicates an xmodem transfer completed.
+// After this callback is issued, the xmodem library will wait
+// until a new buffer is set with xmodem_set_buffer  before accepting
+// a new transfer.
+typedef void xmodem_callback(char* buf, int len, int error);
+void xmodem_set_callback(subscribe_cb buffer_filled);
+
+static char* xmodem_buf = NULL;
+static size_t xmodem_buf_len = 0;
+static uint8_t xmodem_blockno = 0;
+
+void xmodem_set_buffer(char* buf, size_t len) {
+  xmodem_buf = buf;
+  xmodem_buf_len = len;
+  xmodem_blockno = 1;
+}
+
 
 enum {
         SOH = 0x01,   // Start Of Header
@@ -14,7 +35,9 @@ enum {
         ARMBASE = 0x8000
 };
 
-int serial_read_short(char* buf, size_t len) {
+// Performs a single UART read into buf. This read may
+// read fewer than len bytes.
+int serial_read_once(char* buf, size_t len) {
   int read_len = 0;
   void read_callback(int rlen,
                      __attribute__ ((unused)) int unused1,
@@ -35,11 +58,12 @@ int serial_read_short(char* buf, size_t len) {
   return read_len;
 }
 
+// Reads until buf is filled with len bytes.
 int serial_read(char* buf, size_t len) {
   size_t index;
   for (index = 0; index < len;) {
     size_t left = len - index;
-    size_t count = serial_read_short(buf + index, left);
+    size_t count = serial_read_once(buf + index, left);
     index += count;
   }
   return (int)index;
@@ -67,8 +91,35 @@ int serial_write(char* buf, size_t len) {
   return write_len;
 }
 
-static unsigned char getbyte(void) {
-        unsigned t0 = timer_tick();
+
+static unsigned char serial_read_byte_timeout(uint32_t timeout) {
+  bool byte_read = false;
+  bool timeout = false;
+  bool done = false;
+  uint8_t byte = 0;
+  tock_timer_t timer;
+  void read_callback(int rlen,
+                      __attribute__ ((unused)) int unused1,
+                      __attribute__ ((unused)) int unused2,
+                     void* ud) {
+    done = true;
+    if (rlen == 1) {
+      byte_read = true;
+    }
+  }
+  void timer_callback(int wlen,
+                      __attribute__ ((unused)) int unused1,
+                      __attribute__ ((unused)) int unused2,
+                     void* ud) {
+    done = true;
+    timeout = true;
+  }
+
+  timer_in(timeout, timer_callback, NULL, &timer);
+
+  yield_for(&done);
+
+  unsigned t0 = timer_tick();
         // while uart not ready, just keep going; nak every 4 sec
         while(((uart_lcr() & 0x01) == 0)) {
                 unsigned t = timer_tick();
