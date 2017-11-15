@@ -11,12 +11,13 @@ void xmodem_set_buffer(char* buf, size_t len);
 // After this callback is issued, the xmodem library will wait
 // until a new buffer is set with xmodem_set_buffer  before accepting
 // a new transfer.
-typedef void xmodem_callback(char* buf, int len, int error);
-void xmodem_set_callback(subscribe_cb buffer_filled);
+typedef void xmodem_cb(char* buf, int len, int error);
+void xmodem_set_callback(xmodem_cb buffer_filled);
 
 static char* xmodem_buf = NULL;
 static size_t xmodem_buf_len = 0;
 static uint8_t xmodem_blockno = 0;
+static xmodem_cb xmodem_callback = NULL;
 
 void xmodem_set_buffer(char* buf, size_t len) {
   xmodem_buf = buf;
@@ -24,6 +25,9 @@ void xmodem_set_buffer(char* buf, size_t len) {
   xmodem_blockno = 1;
 }
 
+void xmodem_set_callback(xmodem_cb buffer_filled) {
+  xmodem_callback = buffer_filled;
+}
 
 enum {
         SOH = 0x01,   // Start Of Header
@@ -91,10 +95,19 @@ int serial_write(char* buf, size_t len) {
   return write_len;
 }
 
-
+// There need to be allocated not on the stack in case both
+// the read and the timeout callbacks are enqueued. If the read
+// is enqueued first, then the function will exit, and the timer
+// callback might later write on a defunct stack frame. The worst
+// case is that it's triggered on the next call to yield_for in
+// this function, at which point it'll seem like the timer fired
+// immediately. All this will do is produce a NACK.
+//  -pal
+bool byte_read = false;
+bool timeout = false;
 static unsigned char serial_read_byte_timeout(uint32_t timeout) {
-  bool byte_read = false;
-  bool timeout = false;
+  byte_read = false;
+  timeout = false;
   bool done = false;
   uint8_t byte = 0;
   tock_timer_t timer;
@@ -114,9 +127,38 @@ static unsigned char serial_read_byte_timeout(uint32_t timeout) {
     done = true;
     timeout = true;
   }
+  while (byte_read == false) {
+    timer_in(timeout, timer_callback, NULL, &timer);
 
-  timer_in(timeout, timer_callback, NULL, &timer);
+    int ret = allow(0, 0, &byte, sizeof(uint8_t));
+    bool done = false;
+    if (ret < 0)  return ret;
+    ret = subscribe(0, 0, read_callback, &done);
+    if (ret < 0)  return ret;
+    ret = command(0, 2, sizeof(uint8_t));
+    if (ret < 0)  return ret;
 
+    yield_for(&done);
+
+    if (byte_read) {
+      timer_cancel(&timer);
+      return byte;
+    }
+    uint8_t nack = NAK;
+    serial_write(&nack, 1);
+  }
+
+  return read_len;
+}
+
+// Reads until buf is filled with len bytes.
+int serial_read(char* buf, size_t len) {
+  size_t index;
+  for (index = 0; index < len;) {
+    size_t left = len - index;
+    size_t count = serial_read_once(buf + index, left);
+    index += count;
+  }
   yield_for(&done);
 
   unsigned t0 = timer_tick();
