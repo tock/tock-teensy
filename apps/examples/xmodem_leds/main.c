@@ -74,11 +74,19 @@ static void update_strip(void) {
 
 int xmodem_init(void);
 void xmodem_set_buffer(char* buf, size_t len);
+typedef void xmodem_cb(char* buf, int len, int error);
+void xmodem_set_callback(xmodem_cb buffer_filled);
+
+bool update = false;
+void xmodem_callback(char* buf, int len, int error) {
+    update = true;
+}
 
 int main(void) {
     initialize_strip();
     xmodem_init();
     xmodem_set_buffer(pixels, PIXEL_BUFFER_SIZE);
+    xmodem_set_callback(xmodem_callback);
     int i;
     for (i = 0; i < NUM_PIXELS; i++) {
         set_pixel(i, 0);
@@ -86,7 +94,15 @@ int main(void) {
     }
 
     set_pixel(8, color(32, 32, 32));
+    update_strip();
+    set_pixel(9, color(32, 32, 32));
+    set_pixel(11, color(32, 32, 32));
     while (1) {
-        update_strip();
+        yield();
+	if (update) {
+            led_toggle(0);
+            update = false;
+            update_strip();
+	}
     }
 }

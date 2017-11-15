@@ -1,5 +1,6 @@
 #include <tock.h>
 #include <timer.h>
+#include <led.h>
 
 // Set the buffer that xmodem should fill with a transfer.
 void xmodem_set_buffer(char* buf, size_t len);
@@ -92,6 +93,8 @@ void xmodem_read_callback(__attribute__ ((unused)) int unused0,
   // Restart the NAK read timeout
   timer_cancel(&xmodem_timer);
   timer_in(XMODEM_TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
+  // issue another read
+  command(0, 2, sizeof(uint8_t));
 
   switch (xmodem_state) {
   case NEW_BLOCK:
@@ -102,9 +105,11 @@ void xmodem_read_callback(__attribute__ ((unused)) int unused0,
         uint32_t size = (xmodem_block_number - 1) * PAYLOAD_SIZE ;
         xmodem_callback(xmodem_buffer, size, 0);
       }
+      xmodem_block_number = 1;
       break;
     case SOH:
       xmodem_state = BLOCK_NUMBER;
+      xmodem_checksum = 0;
       break;
     default:
       xmodem_restart_block();
@@ -115,7 +120,7 @@ void xmodem_read_callback(__attribute__ ((unused)) int unused0,
     if (xmodem_recv == xmodem_block_number) {
       xmodem_state = BLOCK_INVERSE;
     } else { // Go back to beginning of block
-      xmodem_restart_block();
+      xmodem_restart_transfer();
     }
     break;
   case BLOCK_INVERSE:
@@ -123,7 +128,7 @@ void xmodem_read_callback(__attribute__ ((unused)) int unused0,
       xmodem_state = DATA;
       xmodem_byte_count = 0;
     } else { // Go back to beginning of block
-      xmodem_restart_block();
+      xmodem_restart_transfer();
     }
     break;
   case DATA: {
@@ -146,10 +151,11 @@ void xmodem_read_callback(__attribute__ ((unused)) int unused0,
 	     }
   case CHECKSUM:
     if (xmodem_recv != xmodem_checksum) {
-      xmodem_restart_block();
+      xmodem_restart_transfer();
     } else {
       xmodem_write(ACK);
       xmodem_block_number++;
+      xmodem_state = NEW_BLOCK;
     }
     break;
   case STOP:
@@ -171,7 +177,7 @@ void xmodem_timer_callback(__attribute__ ((unused)) int unused0,
                            __attribute__ ((unused)) int unused1,
                            __attribute__ ((unused)) int unused2,
                            __attribute__ ((unused)) void* ud) {
-  xmodem_write(NAK);
+  int ret = xmodem_write(NAK);
   timer_in(XMODEM_TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
 }
 
@@ -182,7 +188,11 @@ void xmodem_timer_callback(__attribute__ ((unused)) int unused0,
 int xmodem_write(uint8_t byte) {
   if (xmodem_write_busy == false) {
     xmodem_send = byte;
-    int ret = command(0, 1, sizeof(uint8_t));
+    int ret = allow(0, 1, &xmodem_send, sizeof(uint8_t));
+    if (ret < 0) return ret;
+    ret = subscribe(0, 1, xmodem_write_callback, NULL);
+    if (ret < 0) return ret;
+    ret = command(0, 1, sizeof(uint8_t));
     if (ret == 0) {
       xmodem_write_busy = true;
       return 0;
@@ -204,14 +214,10 @@ int xmodem_init(void) {
   ret = command(0, 2, sizeof(uint8_t));
   if (ret < 0)  return ret;
 
-  // Setup writes but no writes yet
-  ret = allow(0, 1, &xmodem_send, sizeof(uint8_t));
-  if (ret < 0) return ret;
-  ret = subscribe(0, 1, xmodem_write_callback, NULL);
-  if (ret < 0) return ret;
 
   // Set the timeout
   timer_in(XMODEM_TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
+  led_on(0);
   return 0;
 }
 

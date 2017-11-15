@@ -1,42 +1,189 @@
 #!/usr/bin/python
-import sys
-import serial
+
+"""Julie Zelenski 2017.
+Based on earlier rpi-install.py by Pat Hanrahan.
+Edited by Omar Rizwan 2017-04-23.
+
+This bootloader client is used to upload binary image to execute on
+Raspberry Pi.
+
+Communicates over serial port using xmodem protocol.
+
+Should work with:
+- Python 2.7+ and Python 3
+- any version of the on-Pi bootloader
+- macOS and Linux
+
+Maybe Cygwin and Ubuntu on Windows as well.
+
+Dependencies:
+
+    # pip install {pyserial,xmodem}
+
+"""
+from __future__ import print_function
+import argparse, logging, os, serial, sys, time
+from serial.tools import list_ports
 from xmodem import XMODEM
 
-if len(sys.argv) == 3:
-    portname = sys.argv[1]
-    filename = sys.argv[2]
-elif len(sys.argv) == 2:
-    portname = "/dev/tty.SLAB_USBtoUART"
-    filename = sys.argv[1]
-else:
-    print "usage: %s tty bin" % sys.argv[0]
+# This version updated May 30, 2017 with timeout flag.
+VERSION = 0.7
+
+# From https://stackoverflow.com/questions/287871/print-in-terminal-with-colors-using-python
+# Plus Julie's suggestion to push bold and color together.
+class bcolors:
+    RED = '\033[31m'
+    BLUE = '\033[34m'
+    GREEN = '\033[32m'
+    BOLD = '\033[1m'
+    OKBLUE = BOLD + BLUE
+    OKGREEN = BOLD + GREEN
+    FAIL = BOLD + RED
+    ENDC = '\033[0m'
+
+def error(shortmsg, msg=""):
+    sys.stderr.write("\n%s: %s\n" % (
+        sys.argv[0],
+        bcolors.FAIL + shortmsg + bcolors.ENDC + "\n" + msg
+    ))
     sys.exit(1)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="This script sends a binary file to the Raspberry Pi bootloader. Version %s." % VERSION)
 
-port = serial.Serial(port=portname, baudrate=115200)
-if not port:
-    print portname, 'not found'
-    sys.exit(1)
+    parser.add_argument("port", help="serial port", nargs="?")
+    parser.add_argument("file", help="binary file to upload",
+                        type=argparse.FileType('rb'))
+    parser.add_argument('-v', help="verbose logging of serial activity",
+                        action="store_true")
+    parser.add_argument('-r', help="reset Pi by pulling DTR pin low",
+                        action="store_true")
+    parser.add_argument('-q', help="do not print while uploading",
+                        action="store_true")
+    parser.add_argument('-t', help="timeout for -p",
+                        action="store", type=int, default=100)
 
-stream = file(filename, 'rb')
-if not stream:
-    print filename, 'not found'
-    sys.exit(1)
+    after = parser.add_mutually_exclusive_group()
+    after.add_argument('-p', help="print output from the Pi after uploading",
+                       action="store_true")
+    after.add_argument('-s', help="open `screen` on the serial port after uploading",
+                       action="store_true")
 
-# problem was the timeout=0
-#   needed to wait for NAK
-def getc(size, timeout=1):
-    return port.read(size)
 
-def putc(data, timeout=1):
-    port.write(data)
+    args = parser.parse_args()
 
-xmodem = XMODEM(getc, putc)
+    def printq(*pos_args, **kwargs):
+        if not args.q:
+            print(*pos_args, **kwargs)
 
-status = xmodem.send(stream)
-print 'sent', status
+    logging.getLogger().addHandler(logging.StreamHandler())
+    if args.v: logging.getLogger().setLevel(logging.DEBUG)
 
-stream.close()
-sys.exit(int(not status))
+    if args.port:
+        portname = args.port
+    else:
+        # The CP2102 units from winter 2014-15 and spring 2016-17 both have
+        # vendor ID 0x10C4 and product ID 0xEA60.
+        try:
+            # pyserial 2.6 in the VM has a bug where grep is case-sensitive.
+            # It also requires us to use [0] instead of .device on the result
+            # to get the serial device path.
+            portname = next(list_ports.grep(r'(?i)VID:PID=10C4:EA60'))[0]
+            printq('Found serial port:', bcolors.OKBLUE + portname + bcolors.ENDC)
 
+            # We used to just have a preset list --
+            # /dev/tty.SLAB_USBtoUART for macOS + Silicon Labs driver,
+            # /dev/cu.usbserial for Prolific,
+            # /dev/ttyUSB0 for Linux, etc.
+            # Hopefully the device ID-based finder is more reliable.
+
+        except StopIteration:
+            error("Couldn't find serial port", """
+I looked through the serial ports on your computer, and couldn't
+find any port associated with a CP2102 USB-to-serial adapter. Is
+your Pi plugged in?
+""")
+
+    try:
+        # timeout set at creation of Serial will be used as default for both read/write
+        port = serial.Serial(port=portname, baudrate=115200, timeout=2)
+        if args.r:
+            printq("Toggling DTR pin to reset Pi: low... ", end='')
+            sys.stdout.flush()
+            port.dtr = True # Pull DTR pin low.
+            time.sleep(0.2) # Wait for Pi to reset.
+
+            printq("high. Waiting for Pi to boot... ", end='')
+            sys.stdout.flush()
+            port.dtr = False # Pull DTR pin high.
+            time.sleep(1) # Wait for Pi to boot.
+
+            # Flush port "123456", etc.
+            port.close()
+            port.open()
+
+            printq("Done.")
+
+    except (OSError, serial.serialutil.SerialException):
+        error("The serial port `%s` is not available" % portname, """
+Do you have a `screen` or `rpi-install.py` currently running that's
+hanging onto that port?
+""")
+
+    stream = args.file
+    printq("Sending `%s` (%d bytes): " % (stream.name, os.stat(stream.name).st_size), end='')
+
+    success = False
+    def getc(size, timeout=1):
+        ch = port.read(size)
+        # echo 'x' to report failure if read timed out/failed
+        if ch == b'':
+            if not success: printq('x', end='')
+            sys.stdout.flush()
+        return ch
+
+    def putc(data, timeout=1):
+        n = port.write(data)
+        # echo '.' to report full packet successfully sent
+        if n >= 128:
+            printq('.', end='')
+            sys.stdout.flush()
+
+    try:
+        xmodem = XMODEM(getc, putc)
+        success = xmodem.send(stream, retry=5)
+        if not success:
+            error("Send failed (bootloader not listening?)", """
+I waited a few seconds for an acknowledgement from the bootloader
+and didn't hear anything. Do you need to reset your Pi?
+
+Further help at http://cs107e.github.io/guides/bootloader/#troubleshooting
+""")
+    except serial.serialutil.SerialException as ex:
+        error(str(ex))
+    except KeyboardInterrupt:
+        error("Canceled by user pressing Ctrl-C.", """
+You should probably restart the Pi, since you interrupted it mid-load.
+""")
+
+    printq(bcolors.OKGREEN + "\nSuccessfully sent!" + bcolors.ENDC)
+    stream.close()
+
+    start = time.time()
+    if args.p:  # Print after sending.
+        try:
+            while True:
+                if time.time() - start > args.t:
+                    break
+
+                c = getc(1)
+                if c == chr(4): break # End of transmission.
+                if c is None: continue
+
+                print(c,end='')
+        except:
+            pass
+    elif args.s:  # Run `screen` after sending.
+        sys.exit(os.system('screen %s 115200' % portname))
+
+    sys.exit(0)
