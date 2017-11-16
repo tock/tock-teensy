@@ -30,7 +30,7 @@ pub struct PortRegisters {
 bitfields! [ u32,
     PCR PinControl [
         ISF 24 [],
-        IRQC (Mask(0b1111), 16) [
+        IRQC (16, Mask(0b1111)) [
             InterruptDisabled = 0,
             DmaRisingEdge = 1,
             DmaFallingEdge = 2,
@@ -42,7 +42,7 @@ bitfields! [ u32,
             InterruptLogicHigh = 12
         ],
         LK 15 [],
-        MUX (Mask(0b111), 8) [],
+        MUX (8, Mask(0b111)) [],
         DSE 6 [],
         ODE 5 [],
         PFE 4 [],

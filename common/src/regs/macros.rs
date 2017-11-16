@@ -18,7 +18,7 @@ macro_rules! bitmasks {
 
     {
         $valtype:ty, $reg_desc:ident, $field:ident,
-                    (Mask($mask:expr), $shift:expr),
+                    ($shift:expr, Mask($mask:expr)),
                     [$( $valname:ident = $value:expr ),*]
     } => {
         #[allow(non_upper_case_globals)]

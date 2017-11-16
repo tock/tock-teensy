@@ -1,6 +1,7 @@
 #include <tock.h>
 #include <timer.h>
 #include <led.h>
+#include <console.h>
 
 // Set the buffer that xmodem should fill with a transfer.
 void xmodem_set_buffer(char* buf, size_t len);
@@ -94,7 +95,7 @@ void xmodem_read_callback(__attribute__ ((unused)) int unused0,
   timer_cancel(&xmodem_timer);
   timer_in(XMODEM_TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
   // issue another read
-  int ret = command(0, 2, sizeof(uint8_t));
+  int ret = command(DRIVER_NUM_CONSOLE, 2, sizeof(uint8_t), 0);
   if (ret < 0 ) {
     xmodem_restart_transfer();
   } 
@@ -182,6 +183,7 @@ void xmodem_timer_callback(__attribute__ ((unused)) int unused0,
                            __attribute__ ((unused)) int unused2,
                            __attribute__ ((unused)) void* ud) {
   xmodem_write(NAK);
+  led_toggle(0);
   timer_in(XMODEM_TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
 }
 
@@ -192,11 +194,11 @@ void xmodem_timer_callback(__attribute__ ((unused)) int unused0,
 int xmodem_write(uint8_t byte) {
   if (xmodem_write_busy == false) {
     xmodem_send = byte;
-    int ret = allow(0, 1, &xmodem_send, sizeof(uint8_t));
+    int ret = allow(DRIVER_NUM_CONSOLE, 1, &xmodem_send, sizeof(uint8_t));
     if (ret < 0) return ret;
-    ret = subscribe(0, 1, xmodem_write_callback, NULL);
+    ret = subscribe(DRIVER_NUM_CONSOLE, 1, xmodem_write_callback, NULL);
     if (ret < 0) return ret;
-    ret = command(0, 1, sizeof(uint8_t));
+    ret = command(DRIVER_NUM_CONSOLE, 1, sizeof(uint8_t), 0);
     if (ret == 0) {
       xmodem_write_busy = true;
       return 0;
@@ -210,18 +212,19 @@ int xmodem_init(void) {
   xmodem_block_number = 1;
   xmodem_byte_count = 0;
 
+  led_on(0);
+
   // Start reading
-  int ret = allow(0, 0, &xmodem_recv, sizeof(uint8_t));
+  int ret = allow(DRIVER_NUM_CONSOLE, 0, &xmodem_recv, sizeof(uint8_t));
   if (ret < 0)  return ret;
-  ret = subscribe(0, 0, xmodem_read_callback, NULL);
+  ret = subscribe(DRIVER_NUM_CONSOLE, 0, xmodem_read_callback, NULL);
   if (ret < 0)  return ret;
-  ret = command(0, 2, sizeof(uint8_t));
+  ret = command(DRIVER_NUM_CONSOLE, 2, sizeof(uint8_t), 0);
   if (ret < 0)  return ret;
 
 
   // Set the timeout
   timer_in(XMODEM_TIMEOUT, xmodem_timer_callback, NULL, &xmodem_timer);
-  led_on(0);
   return 0;
 }
 

@@ -57,7 +57,7 @@ bitfields! {u8,
             One = 0,
             Two = 1
         ],
-        SBR (Mask(0b11111), 0) []
+        SBR (0, Mask(0b11111)) []
     ],
     C1 Control1 [
         LOOPS 7 [],
@@ -125,7 +125,7 @@ bitfields! {u8,
         MAEN1 7 [],
         MAEN2 6 [],
         M10 5 [],
-        BRFA (Mask(0b11111), 0) []
+        BRFA (0, Mask(0b11111)) []
     ],
     C5 Control5 [
         TDMAS 7,

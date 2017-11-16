@@ -10,7 +10,6 @@ TEENSY_LOADER=teensy_loader_cli
 APP ?= examples/blink
 APP_NAME = $(shell basename $(APP))
 
-# include the base Tock kernel makefile
 include ../../tock/boards/Makefile.common
 
 .PHONY: program

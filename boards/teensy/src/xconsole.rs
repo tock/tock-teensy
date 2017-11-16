@@ -14,7 +14,7 @@
 //!                  115200,
 //!                  &mut xconsole::WRITE_BUF,
 //!                  &mut xconsole::READ_BUF,
-//!                  kernel::Container::create()));
+//!                  kernel::Grant::create()));
 //! hil::uart::UART::set_client(&usart::USART0, console);
 //! ```
 //!
@@ -40,10 +40,12 @@
 
 use core::cell::Cell;
 use core::cmp;
-use kernel::{AppId, AppSlice, Container, Callback, Shared, Driver, ReturnCode};
+use kernel::{AppId, AppSlice, Grant, Callback, Shared, Driver, ReturnCode};
 use kernel::common::take_cell::TakeCell;
 use kernel::hil::uart::{self, UART, Client};
 use kernel::process::Error;
+
+pub const DRIVER_NUM: usize = 0x00000001;
 
 pub struct App {
     write_callback: Option<Callback>,
@@ -76,7 +78,7 @@ pub static mut READ_BUF: [u8; 80] = [0; 80];
 
 pub struct XConsole<'a, U: UART + 'a> {
     uart: &'a U,
-    apps: Container<App>,
+    apps: Grant<App>,
     in_progress_tx: Cell<Option<AppId>>,
     tx_buffer: TakeCell<'static, [u8]>,
     rx_buffer: TakeCell<'static, [u8]>,
@@ -89,7 +91,7 @@ impl<'a, U: UART> XConsole<'a, U> {
                baud_rate: u32,
                tx_buffer: &'static mut [u8],
                rx_buffer: &'static mut [u8],
-               container: Container<App>)
+               container: Grant<App>)
                -> XConsole<'a, U> {
         XConsole {
             uart: uart,
@@ -253,7 +255,7 @@ impl<'a, U: UART> Driver for XConsole<'a, U> {
     /// - `0`: Driver check.
     /// - `1`: Prints a buffer passed through `allow` up to the length passed in
     ///        `arg1`
-    fn command(&self, cmd_num: usize, arg1: usize, appid: AppId) -> ReturnCode {
+    fn command(&self, cmd_num: usize, arg1: usize, _: usize, appid: AppId) -> ReturnCode {
         match cmd_num {
             0 /* check if present */ => ReturnCode::SUCCESS,
             1 /* putstr */ => {

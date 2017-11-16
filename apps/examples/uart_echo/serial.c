@@ -14,12 +14,12 @@ int serial_read_short(char* buf, size_t len) {
     read_len = rlen;
   }
 
-  int ret = allow(0, 0, buf, len);
+  int ret = allow(1, 0, buf, len);
   bool done = false;
   if (ret < 0)  return ret;
-  ret = subscribe(0, 0, read_callback, &done);
+  ret = subscribe(1, 0, read_callback, &done);
   if (ret < 0)  return ret;
-  ret = command(0, 2, len);
+  ret = command(1, 2, len, 0);
   if (ret < 0)  return ret;
   yield_for(&done);
   return read_len;
@@ -46,13 +46,13 @@ int serial_write(char* buf, size_t len) {
   }
   bool done = false;
 
-  int ret = allow(0, 1, buf, len);
+  int ret = allow(1, 1, buf, len);
   if (ret < 0) return ret;
 
-  ret = subscribe(0, 1, write_callback, &done);
+  ret = subscribe(1, 1, write_callback, &done);
   if (ret < 0) return ret;
 
-  ret = command(0, 1, len);
+  ret = command(1, 1, len, 0);
   yield_for(&done);
   return write_len;
 }

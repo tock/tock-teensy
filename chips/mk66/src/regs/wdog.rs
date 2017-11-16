@@ -30,13 +30,13 @@ bitfields![u16,
         WDOGEN 0
     ],
     REFRESH Refresh [
-        KEY (Mask(0xFFFF), 0) [
+        KEY (0, Mask(0xFFFF)) [
             Key1 = 0xA602,
             Key2 = 0xB480
         ]
     ],
     UNLOCK Unlock [
-        KEY (Mask(0xFFFF), 0) [
+        KEY (0, Mask(0xFFFF)) [
             Key1 = 0xC520,
             Key2 = 0xD928
         ]

@@ -1,6 +1,6 @@
 #![no_std]
 #![no_main]
-#![feature(asm,const_fn,drop_types_in_const,lang_items,compiler_builtins_lib)]
+#![feature(asm,const_fn,lang_items,compiler_builtins_lib)]
 
 extern crate capsules;
 extern crate compiler_builtins;
@@ -20,11 +20,12 @@ pub mod io;
 #[allow(dead_code)]
 mod tests;
 
-use capsules::timer::TimerDriver;
+use capsules::virtual_spi::{VirtualSpiMasterDevice, MuxSpiMaster};
+
+use capsules::alarm::AlarmDriver;
 use capsules::spi::Spi;
 use capsules::gpio::GPIO;
 use capsules::led::{ActivationMode, LED};
-use capsules::virtual_spi::{VirtualSpiMasterDevice, MuxSpiMaster};
 use kernel::hil::spi::SpiMaster;
 use kernel::hil::uart::UART;
 pub mod xconsole;
@@ -34,7 +35,7 @@ struct Teensy {
     xconsole: &'static xconsole::XConsole<'static, mk66::uart::Uart>,
     gpio: &'static GPIO<'static, mk66::gpio::Gpio<'static>>,
     led: &'static LED<'static, mk66::gpio::Gpio<'static>>,
-    timer: &'static TimerDriver<'static, mk66::pit::Pit<'static>>,
+    alarm: &'static AlarmDriver<'static, mk66::pit::Pit<'static>>,
     spi: &'static Spi<'static, VirtualSpiMasterDevice<'static, mk66::spi::Spi<'static>>>,
     ipc: kernel::ipc::IPC,
 }
@@ -44,15 +45,15 @@ impl kernel::Platform for Teensy {
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
         match driver_num {
-            0 => f(Some(self.xconsole)),
-            1 => f(Some(self.gpio)),
+            xconsole::DRIVER_NUM => f(Some(self.xconsole)),
+            capsules::gpio::DRIVER_NUM => f(Some(self.gpio)),
 
-            3 => f(Some(self.timer)),
-            4 => f(Some(self.spi)),
+            capsules::alarm::DRIVER_NUM => f(Some(self.alarm)),
+            capsules::spi::DRIVER_NUM => f(Some(self.spi)),
 
-            8 => f(Some(self.led)),
+            capsules::led::DRIVER_NUM => f(Some(self.led)),
 
-            0xff => f(Some(&self.ipc)),
+            kernel::ipc::DRIVER_NUM => f(Some(&self.ipc)),
             _ => f(None),
         }
     }
@@ -104,7 +105,7 @@ pub unsafe fn reset_handler() {
                                     115200,
                                     &mut xconsole::WRITE_BUF,
                                     &mut xconsole::READ_BUF,
-                                    kernel::Container::create())
+                                    kernel::Grant::create())
     );
     uart::UART0.set_client(xconsole);
     xconsole.initialize();
@@ -115,12 +116,12 @@ pub unsafe fn reset_handler() {
         );
     kernel::debug::assign_console_driver(Some(xconsole), kc);
 
-    let timer = static_init!(
-            TimerDriver<'static, mk66::pit::Pit>,
-            TimerDriver::new(&pit::PIT,
-                             kernel::Container::create())
+    let alarm = static_init!(
+            AlarmDriver<'static, mk66::pit::Pit>,
+            AlarmDriver::new(&pit::PIT,
+                             kernel::Grant::create())
         );
-    pit::PIT.set_client(timer);
+    pit::PIT.set_client(alarm);
 
     let mux_spi = static_init!(
             MuxSpiMaster<'static, spi::Spi<'static>>,
@@ -181,17 +182,14 @@ pub unsafe fn reset_handler() {
         xconsole: xconsole,
         gpio: gpio,
         led: led,
-        timer: timer,
+        alarm: alarm,
         spi: spi,
         ipc: kernel::ipc::IPC::new(),
     };
 
     let mut chip = mk66::chip::MK66::new();
-    debug!("Booting Tock on Teensy.");
     uart::UART0.enable_rx();
-    debug!("Enabled UART reception.");
     uart::UART0.enable_rx_interrupts();
-    debug!("Enabled UART interrupts.");
 
     if tests::TEST {
         tests::test();

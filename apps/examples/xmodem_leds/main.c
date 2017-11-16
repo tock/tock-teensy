@@ -92,7 +92,6 @@ int main(void) {
         set_pixel(i, 0);
         update_strip();
     }
-
     set_pixel(8, color(32, 32, 32));
     update_strip();
     set_pixel(9, color(32, 32, 32));
@@ -100,7 +99,6 @@ int main(void) {
     while (1) {
         yield();
 	if (update) {
-            led_toggle(0);
             update = false;
             update_strip();
 	}

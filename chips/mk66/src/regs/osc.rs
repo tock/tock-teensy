@@ -12,7 +12,7 @@ bitfields![u8,
     CR Control [
         ERCLKEN 7 [],
         EREFSTEN 5 [],
-        CAP (Mask(0b1111), 0) [
+        CAP (0, Mask(0b1111)) [
             Load_0pF = 0b0000,
             Load_2pF = 0b1000,
             Load_4pF = 0b0100,
@@ -32,7 +32,7 @@ bitfields![u8,
         ]
     ],
     DIV Divider [
-        ERPS (Mask(0b11), 6) [
+        ERPS (6, Mask(0b11)) [
             Div1 = 0,
             Div2 = 1,
             Div4 = 2,
