@@ -4,8 +4,10 @@
 Based on earlier rpi-install.py by Pat Hanrahan.
 Edited by Omar Rizwan 2017-04-23.
 
-This bootloader client is used to upload binary image to execute on
-Raspberry Pi.
+This program was designed to be a bootloader client to upload binary 
+images to execute on a bare metal Raspberry Pi. However, it can also
+be used to just perform basic xmodem transfers, and so you can use it
+to upload new images for an embedded system controlling a bicycle light.
 
 Communicates over serial port using xmodem protocol.
 
@@ -49,14 +51,12 @@ def error(shortmsg, msg=""):
     sys.exit(1)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="This script sends a binary file to the Raspberry Pi bootloader. Version %s." % VERSION)
+    parser = argparse.ArgumentParser(description="This script sends a binary file over a serial port using xmodem. Version %s." % VERSION)
 
     parser.add_argument("port", help="serial port", nargs="?")
     parser.add_argument("file", help="binary file to upload",
                         type=argparse.FileType('rb'))
     parser.add_argument('-v', help="verbose logging of serial activity",
-                        action="store_true")
-    parser.add_argument('-r', help="reset Pi by pulling DTR pin low",
                         action="store_true")
     parser.add_argument('-q', help="do not print while uploading",
                         action="store_true")
@@ -64,7 +64,7 @@ if __name__ == "__main__":
                         action="store", type=int, default=100)
 
     after = parser.add_mutually_exclusive_group()
-    after.add_argument('-p', help="print output from the Pi after uploading",
+    after.add_argument('-p', help="print output after uploading",
                        action="store_true")
     after.add_argument('-s', help="open `screen` on the serial port after uploading",
                        action="store_true")
@@ -107,22 +107,6 @@ your Pi plugged in?
     try:
         # timeout set at creation of Serial will be used as default for both read/write
         port = serial.Serial(port=portname, baudrate=115200, timeout=2)
-        if args.r:
-            printq("Toggling DTR pin to reset Pi: low... ", end='')
-            sys.stdout.flush()
-            port.dtr = True # Pull DTR pin low.
-            time.sleep(0.2) # Wait for Pi to reset.
-
-            printq("high. Waiting for Pi to boot... ", end='')
-            sys.stdout.flush()
-            port.dtr = False # Pull DTR pin high.
-            time.sleep(1) # Wait for Pi to boot.
-
-            # Flush port "123456", etc.
-            port.close()
-            port.open()
-
-            printq("Done.")
 
     except (OSError, serial.serialutil.SerialException):
         error("The serial port `%s` is not available" % portname, """
