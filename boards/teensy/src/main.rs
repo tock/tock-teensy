@@ -20,15 +20,18 @@ pub mod io;
 #[allow(dead_code)]
 mod tests;
 
+#[allow(dead_code)]
+mod spi;
+
 use capsules::virtual_spi::{VirtualSpiMasterDevice, MuxSpiMaster};
 
 use capsules::alarm::AlarmDriver;
-use capsules::spi::Spi;
 use capsules::console::Console;
 use capsules::gpio::GPIO;
 use capsules::led::{ActivationMode, LED};
 use kernel::hil::spi::SpiMaster;
 use kernel::hil::uart::UART;
+use spi::Spi;
 
 
 #[allow(unused)]
@@ -50,7 +53,7 @@ impl kernel::Platform for Teensy {
             capsules::gpio::DRIVER_NUM => f(Some(self.gpio)),
 
             capsules::alarm::DRIVER_NUM => f(Some(self.alarm)),
-            capsules::spi::DRIVER_NUM => f(Some(self.spi)),
+            spi::DRIVER_NUM => f(Some(self.spi)),
 
             capsules::led::DRIVER_NUM => f(Some(self.led)),
 
@@ -75,11 +78,15 @@ pub unsafe fn set_pin_primary_functions() {
 
     PD05.claim_as(SPI1_SCK);
     PD06.claim_as(SPI1_MOSI);
+
+    PC06.claim_as(SPI0_MOSI);
+    PC07.claim_as(SPI0_MISO);
+    PA15.claim_as(SPI0_SCK);
 }
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
-    use mk66::{clock, wdog, sim, pit, spi, uart};
+    use mk66::{clock, wdog, sim, pit, uart};
     use mk66::sim::Clock;
     use mk66::gpio::*;
 
@@ -96,7 +103,8 @@ pub unsafe fn reset_handler() {
     sim::clocks::PORTABCDE.enable();
 
     pit::PIT.init();
-    spi::SPI1.init();
+    mk66::spi::SPI0.init();
+    mk66::spi::SPI1.init();
 
     set_pin_primary_functions();
 
@@ -123,27 +131,37 @@ pub unsafe fn reset_handler() {
         );
     pit::PIT.set_client(alarm);
 
-    let mux_spi = static_init!(
-            MuxSpiMaster<'static, spi::Spi<'static>>,
-            MuxSpiMaster::new(&spi::SPI1)
+    let mux_spi0 = static_init!(
+            MuxSpiMaster<'static, mk66::spi::Spi<'static>>,
+            MuxSpiMaster::new(&mk66::spi::SPI0)
+        );
+    let mux_spi1 = static_init!(
+            MuxSpiMaster<'static, mk66::spi::Spi<'static>>,
+            MuxSpiMaster::new(&mk66::spi::SPI1)
         );
 
-    spi::SPI1.set_client(mux_spi);
+    mk66::spi::SPI0.set_client(mux_spi0);
+    mk66::spi::SPI1.set_client(mux_spi1);
 
     let virtual_spi = static_init!(
-            VirtualSpiMasterDevice<'static, spi::Spi<'static>>,
-            VirtualSpiMasterDevice::new(mux_spi, 0)
+            [VirtualSpiMasterDevice<'static, mk66::spi::Spi<'static>>; 2],
+            [VirtualSpiMasterDevice::new(mux_spi0, 0),
+             VirtualSpiMasterDevice::new(mux_spi1, 0)]
+
         );
 
     let spi = static_init!(
-            capsules::spi::Spi<'static, VirtualSpiMasterDevice<'static, spi::Spi<'static>>>,
-            capsules::spi::Spi::new(virtual_spi)
+            Spi<'static, VirtualSpiMasterDevice<'static, mk66::spi::Spi<'static>>>,
+            Spi::new(virtual_spi)
         );
 
     static mut SPI_READ_BUF: [u8; 1024] = [0; 1024];
     static mut SPI_WRITE_BUF: [u8; 1024] = [0; 1024];
+
     spi.config_buffers(&mut SPI_READ_BUF, &mut SPI_WRITE_BUF);
-    virtual_spi.set_client(spi);
+
+    virtual_spi[0].set_client(spi);
+    virtual_spi[1].set_client(spi);
 
     let gpio_pins = static_init!(
         [&'static Gpio; 8],
