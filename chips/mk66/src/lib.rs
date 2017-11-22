@@ -1,6 +1,5 @@
 #![crate_name = "mk66"]
 #![crate_type = "rlib"]
-#![feature(associated_consts)]
 #![feature(asm,core_intrinsics,concat_idents,const_fn,const_cell_new)]
 #![no_std]
 

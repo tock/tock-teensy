@@ -96,14 +96,14 @@ pub unsafe fn reset_handler() {
     let alarm = AlarmComponent::new().finalize().unwrap();
     
     let xconsole = static_init!(
-            xconsole::XConsole<uart::Uart>,
-            xconsole::XConsole::new(&uart::UART0,
+            xconsole::XConsole<mk66::uart::Uart>,
+            xconsole::XConsole::new(&mk66::uart::UART0,
                                     115200,
                                     &mut xconsole::WRITE_BUF,
                                     &mut xconsole::READ_BUF,
                                     kernel::Grant::create())
     );
-    uart::UART0.set_client(xconsole);
+    mk66::uart::UART0.set_client(xconsole);
     xconsole.initialize();
 
     let kc = static_init!(
@@ -122,8 +122,8 @@ pub unsafe fn reset_handler() {
     };
 
     let mut chip = mk66::chip::MK66::new();
-    uart::UART0.enable_rx();
-    uart::UART0.enable_rx_interrupts();
+    mk66::uart::UART0.enable_rx();
+    mk66::uart::UART0.enable_rx_interrupts();
 
     if tests::TEST {
         tests::test();
