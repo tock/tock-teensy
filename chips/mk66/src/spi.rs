@@ -184,6 +184,10 @@ impl<'a> Spi<'a> {
         !(self.regs().sr.read(SR::TXCTR) >= self.fifo_depth())
     }
 
+    fn rx_fifo_ready(&self) -> bool {
+        self.regs().sr.read(SR::RXCTR) > 0
+    }
+
     fn baud_rate(dbl: u32, prescaler: u32, scaler: u32) -> u32 {
         (clock::bus_clock_hz() * (1 + dbl)) / (prescaler * scaler)
     }
@@ -358,18 +362,36 @@ impl<'a> SpiMaster for Spi<'a> {
                         -> ReturnCode {
 
         self.start_of_queue();
-        for i in 0..len {
-            while !self.tx_fifo_ready() {}
+        if let Some(rbuf) = read_buffer {
+            for i in 0..len {
+                while !self.tx_fifo_ready() {}
 
-            if i == len - 1 {
-                self.end_of_queue();
+                if i == len - 1 {
+                    self.end_of_queue();
+                }
+
+                self.regs().pushr_data.set(write_buffer[i]);
+
+                // TODO: this is pretty hacky
+                while !self.rx_fifo_ready() {}
+                rbuf[i] = self.regs().popr.get() as u8;
             }
 
-            self.regs().pushr_data.set(write_buffer[i]);
+            self.read.put(Some(rbuf));
+        } else {
+            for i in 0..len {
+                while !self.tx_fifo_ready() {}
+
+                if i == len - 1 {
+                    self.end_of_queue();
+                }
+
+                self.regs().pushr_data.set(write_buffer[i]);
+            }
+            self.read.put(None);
         }
 
         self.write.put(Some(write_buffer));
-        self.read.put(read_buffer);
         self.transfer_len.set(len);
 
         ReturnCode::SUCCESS

@@ -479,6 +479,11 @@ pub mod functions {
     pub const UART0_RX: Function<PinB16> = Function::new(Alt3);
     pub const UART0_TX: Function<PinB17> = Function::new(Alt3);
 
+    // SPI0
+    pub const SPI0_MOSI: Function<PinC06> = Function::new(Alt2);
+    pub const SPI0_MISO: Function<PinC07> = Function::new(Alt2);
+    pub const SPI0_SCK: Function<PinA15> = Function::new(Alt2);
+
     // SPI1
     pub const SPI1_MOSI: Function<PinD06> = Function::new(Alt7);
     pub const SPI1_SCK: Function<PinD05> = Function::new(Alt7);
