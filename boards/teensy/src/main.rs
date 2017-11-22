@@ -26,6 +26,9 @@ mod spi;
 #[allow(dead_code)]
 mod components;
 
+use kernel::hil::uart::UART;
+pub mod xconsole;
+
 #[allow(dead_code)]
 mod pins;
 
@@ -33,7 +36,7 @@ use components::*;
 
 #[allow(unused)]
 struct Teensy {
-    console: <UartConsoleComponent as Component>::Output,
+    xconsole: &'static xconsole::XConsole<'static, mk66::uart::Uart>,
     gpio: <GpioComponent as Component>::Output,
     led: <LedComponent as Component>::Output,
     alarm: <AlarmComponent as Component>::Output,
@@ -46,7 +49,7 @@ impl kernel::Platform for Teensy {
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
         match driver_num {
-            capsules::console::DRIVER_NUM => f(Some(self.console)),
+            xconsole::DRIVER_NUM => f(Some(self.xconsole)),
             capsules::gpio::DRIVER_NUM => f(Some(self.gpio)),
 
             capsules::alarm::DRIVER_NUM => f(Some(self.alarm)),
@@ -91,10 +94,26 @@ pub unsafe fn reset_handler() {
                            .finalize().unwrap();
     let spi = VirtualSpiComponent::new().finalize().unwrap();
     let alarm = AlarmComponent::new().finalize().unwrap();
-    let console = UartConsoleComponent::new().finalize().unwrap();
+    
+    let xconsole = static_init!(
+            xconsole::XConsole<uart::Uart>,
+            xconsole::XConsole::new(&uart::UART0,
+                                    115200,
+                                    &mut xconsole::WRITE_BUF,
+                                    &mut xconsole::READ_BUF,
+                                    kernel::Grant::create())
+    );
+    uart::UART0.set_client(xconsole);
+    xconsole.initialize();
+
+    let kc = static_init!(
+            xconsole::App,
+            xconsole::App::default()
+        );
+    kernel::debug::assign_console_driver(Some(xconsole), kc);
 
     let teensy = Teensy {
-        console: console,
+        xconsole: xconsole,
         gpio: gpio,
         led: led,
         alarm: alarm,
@@ -103,11 +122,12 @@ pub unsafe fn reset_handler() {
     };
 
     let mut chip = mk66::chip::MK66::new();
+    uart::UART0.enable_rx();
+    uart::UART0.enable_rx_interrupts();
 
     if tests::TEST {
         tests::test();
     }
-
     kernel::main(&teensy, &mut chip, load_processes(), &teensy.ipc);
 }
 
@@ -118,16 +138,16 @@ unsafe fn load_processes() -> &'static mut [Option<kernel::Process<'static>>] {
         static _sapps: u8;
     }
 
-    const NUM_PROCS: usize = 2;
+    const NUM_PROCS: usize = 1;
 
     // Total memory allocated to the processes
     #[link_section = ".app_memory"]
-    static mut APP_MEMORY: [u8; 16384] = [0; 16384];
+    static mut APP_MEMORY: [u8; 1 << 17] = [0; 1 << 17];
 
     // How the kernel responds when a process faults
     const FAULT_RESPONSE: kernel::process::FaultResponse = kernel::process::FaultResponse::Panic;
 
-    static mut PROCESSES: [Option<kernel::Process<'static>>; NUM_PROCS] = [None, None];
+    static mut PROCESSES: [Option<kernel::Process<'static>>; NUM_PROCS] = [None];
 
     // Create the processes and allocate the app memory among them
     let mut apps_in_flash_ptr = &_sapps as *const u8;

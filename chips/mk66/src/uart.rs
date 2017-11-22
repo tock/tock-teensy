@@ -1,6 +1,7 @@
 //! Implementation of the MK66 UART Peripheral
 
 use core::cell::Cell;
+use kernel::common::take_cell::TakeCell;
 use kernel::hil;
 use kernel::hil::uart;
 use core::mem;
@@ -12,6 +13,9 @@ pub struct Uart {
     index: usize,
     registers: *mut Registers,
     client: Cell<Option<&'static uart::Client>>,
+    buffer: TakeCell<'static, [u8]>,
+    rx_len: Cell<usize>,
+    rx_index: Cell<usize>
 }
 
 pub static mut UART0: Uart = Uart::new(0);
@@ -25,12 +29,39 @@ impl Uart {
         Uart {
             index: index,
             registers: UART_BASE_ADDRS[index],
-            client: Cell::new(None)
+            client: Cell::new(None),
+            buffer: TakeCell::empty(),
+            rx_len: Cell::new(0),
+            rx_index: Cell::new(0),
         }
     }
 
     pub fn handle_interrupt(&self) {
-        // TODO: implement
+        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
+        // Read byte from data register; reading S1 and D clears interrupt
+        if regs.s1.is_set(S1::RDRF) {
+            let datum: u8 = regs.d.get();
+
+            // Put byte into buffer, trigger callback if buffer full
+            let mut done = false;
+            let mut index = self.rx_index.get();
+            self.buffer.map( |buf| {
+                buf[index] = datum;
+                index = index + 1;
+                if index >= self.rx_len.get() {
+                    done = true;
+                }
+                self.rx_index.set(index);
+            });
+            if done {
+                self.client.get().map(|client| {
+                    match self.buffer.take() {
+                        Some(buf) => client.receive_complete(buf, index, uart::Error::CommandComplete),
+                        None => ()
+                    }
+                });
+            }
+        }
     }
 
     pub fn handle_error(&self) {
@@ -54,7 +85,7 @@ impl Uart {
                       C1::RSRC::CLEAR +
                       C1::M::EightBit +
                       C1::WAKE::Idle +
-                      C1::ILT::AfterStart);
+                      C1::ILT::AfterStop);
     }
 
     fn set_stop_bits(&self, stop_bits: hil::uart::StopBits) {
@@ -88,12 +119,29 @@ impl Uart {
 
     pub fn enable_rx(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c2.write(C2::RE::SET);
+        regs.c1.modify(C1::ILT::SET); // Idle after stop bit
+        regs.c2.modify(C2::RE::SET);  // Enable UART reception
+    }
+
+    pub fn enable_rx_interrupts(&self) {
+        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
+        regs.rwfifo.set(1);               // Issue interrupt on each byte
+        regs.c5.modify(C5::RDMAS::CLEAR); // Issue interrupt on RX data
+
+        match self.index {
+            0 => unsafe {nvic::enable(nvic::NvicIdx::UART0)},
+            1 => unsafe {nvic::enable(nvic::NvicIdx::UART1)},
+            2 => unsafe {nvic::enable(nvic::NvicIdx::UART2)},
+            3 => unsafe {nvic::enable(nvic::NvicIdx::UART3)},
+            4 => unsafe {nvic::enable(nvic::NvicIdx::UART4)},
+            _ => unreachable!()
+        };
+        regs.c2.modify(C2::RIE::SET);     // Enable interrupts
     }
 
     pub fn enable_tx(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c2.write(C2::TE::SET);
+        regs.c2.modify(C2::TE::SET);
     }
 
     fn enable_clock(&self) {
@@ -136,6 +184,7 @@ impl hil::uart::UART for Uart {
         self.set_baud_rate(params.baud_rate);
 
         self.enable_rx();
+        self.enable_rx_interrupts();
         self.enable_tx();
     }
 
@@ -147,14 +196,21 @@ impl hil::uart::UART for Uart {
 
         while !self.tx_ready() {}
 
-        self.client.get().map(move |client| 
+        self.client.get().map(move |client|
             client.transmit_complete(tx_data, uart::Error::CommandComplete)
         );
     }
 
     #[allow(unused_variables)]
     fn receive(&self, rx_buffer: &'static mut [u8], rx_len: usize) {
-        unimplemented!();
+        let mut length = rx_len;
+        if rx_len > rx_buffer.len() {
+            length = rx_buffer.len();
+        }
+
+        self.buffer.put(Some(rx_buffer));
+        self.rx_len.set(length);
+        self.rx_index.set(0);
     }
 }
 

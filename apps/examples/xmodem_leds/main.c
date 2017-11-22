@@ -6,6 +6,7 @@
 #include <spi.h>
 
 #include <stdint.h>
+#include "xmodem.h"
 
 #define NUM_PIXELS 150
 #define PIXEL_BUFFER_SIZE ((NUM_PIXELS*4) + 8)
@@ -15,6 +16,8 @@ static char rbuf[PIXEL_BUFFER_SIZE];
 static uint32_t RED_OFFSET = 3;
 static uint32_t GREEN_OFFSET = 2;
 static uint32_t BLUE_OFFSET = 1;
+
+void xmodem_callback(char* buf, int len, int error);
 
 static void initialize_strip(void) {
     spi_set_chip_select(0);
@@ -61,19 +64,6 @@ static uint32_t __attribute__((unused)) get_pixel(uint32_t pixel) {
                  pixels[pixel*4 + 4 + BLUE_OFFSET]);
 }
 
-static uint32_t wheel(uint8_t wheelpos) {
-    wheelpos = 255 - wheelpos;
-    if (wheelpos < 85) return color(255 - wheelpos * 3, 0, wheelpos * 3);
-
-    if (wheelpos < 170) {
-        wheelpos -= 85;
-        return color(0, wheelpos*3, 255 - wheelpos * 3);
-    }
-
-    wheelpos -= 170;
-    return color(wheelpos*3, 255 - wheelpos * 3, 0);
-}
-
 static void write_cb(__attribute__ ((unused)) int arg0,
                      __attribute__ ((unused)) int arg2,
                      __attribute__ ((unused)) int arg3,
@@ -85,29 +75,32 @@ static void update_strip(void) {
     spi_read_write(pixels, rbuf, PIXEL_BUFFER_SIZE, write_cb, NULL);
 }
 
+bool update = false;
+void xmodem_callback(__attribute__ ((unused)) char* buf, 
+		     __attribute__ ((unused)) int len, 
+		     __attribute__ ((unused)) int error) {
+    update = true;
+}
+
 int main(void) {
     initialize_strip();
-
+    xmodem_init();
+    xmodem_set_buffer(pixels, PIXEL_BUFFER_SIZE);
+    xmodem_set_callback(xmodem_callback);
     int i;
     for (i = 0; i < NUM_PIXELS; i++) {
         set_pixel(i, 0);
         update_strip();
     }
-
-    uint8_t w = 0;
-    uint8_t wb = 255;
-    int which = 0;
-    int dir = 1;
+    set_pixel(8, color(32, 32, 32));
+    update_strip();
+    set_pixel(9, color(32, 32, 32));
+    set_pixel(11, color(32, 32, 32));
     while (1) {
-        delay_ms(20);
-        set_pixel(which, color(0, 0, 0));
-        which = which + dir;
-        set_pixel(which, color(32, 32, 32));
-        if (which == NUM_PIXELS) {
-           dir = -1;
-        } else if (which == 0) {
-           dir = 1;
-        }
-        update_strip();
+        yield();
+	if (update) {
+            update = false;
+            update_strip();
+	}
     }
 }

@@ -1,5 +1,6 @@
 #![crate_name = "mk66"]
 #![crate_type = "rlib"]
+#![feature(associated_consts)]
 #![feature(asm,core_intrinsics,concat_idents,const_fn,const_cell_new)]
 #![no_std]
 
@@ -130,9 +131,9 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 100] = [
     /* I2S0_TX */       Option::Some(unhandled_interrupt),
     /* I2S0_RX */       Option::Some(unhandled_interrupt),
     /* _RESERVED0 */    Option::Some(unhandled_interrupt),
-    /* UART0 */         Option::Some(unhandled_interrupt),
+    /* UART0 */         Option::Some(uart::uart0_handler),
     /* UART0_ERR */     Option::Some(unhandled_interrupt),
-    /* UART1 */         Option::Some(unhandled_interrupt),
+    /* UART1 */         Option::Some(uart::uart1_handler),
     /* UART1_ERR */     Option::Some(unhandled_interrupt),
     /* UART2 */         Option::Some(unhandled_interrupt),
     /* UART2_ERR */     Option::Some(unhandled_interrupt),
