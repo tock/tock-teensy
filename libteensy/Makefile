@@ -1,8 +1,12 @@
+.PHONY: all
+all:
+
+
 TOCK_USERLAND_BASE_DIR ?= ../tock/userland
 
-LIBNAME := libteensy
-$(LIBNAME)_SRCS := $(wildcard *.c)
-$(LIBNAME)_DIR := .
+LIBNAME=libteensy
+$(LIBNAME)_DIR=.
+$(LIBNAME)_SRCS=$(wildcard $($(LIBNAME)_DIR)/*.c)
 
 override CPPFLAGS += -I$(TOCK_USERLAND_BASE_DIR)/libtock
 
