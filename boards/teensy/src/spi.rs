@@ -270,11 +270,11 @@ impl<'a, S: SpiMasterDevice> Driver for Spi<'a, S> {
                 })
             }
             11 /* select underlying SPI HW */ => {
-                self.app.map_or(ReturnCode::FAIL, |app| { 
+                self.app.map_or(ReturnCode::FAIL, |app| {
                     app.spi_hardware.set(arg1);
                     ReturnCode::SUCCESS
                 })
-            } 
+            }
             _ => ReturnCode::ENOSUPPORT
         }
     }

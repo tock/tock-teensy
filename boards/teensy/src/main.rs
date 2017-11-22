@@ -23,24 +23,21 @@ mod tests;
 #[allow(dead_code)]
 mod spi;
 
-use capsules::virtual_spi::{VirtualSpiMasterDevice, MuxSpiMaster};
+#[allow(dead_code)]
+mod components;
 
-use capsules::alarm::AlarmDriver;
-use capsules::console::Console;
-use capsules::gpio::GPIO;
-use capsules::led::{ActivationMode, LED};
-use kernel::hil::spi::SpiMaster;
-use kernel::hil::uart::UART;
-use spi::Spi;
+#[allow(dead_code)]
+mod pins;
 
+use components::*;
 
 #[allow(unused)]
 struct Teensy {
-    console: &'static Console<'static, mk66::uart::Uart>,
-    gpio: &'static GPIO<'static, mk66::gpio::Gpio<'static>>,
-    led: &'static LED<'static, mk66::gpio::Gpio<'static>>,
-    alarm: &'static AlarmDriver<'static, mk66::pit::Pit<'static>>,
-    spi: &'static Spi<'static, VirtualSpiMasterDevice<'static, mk66::spi::Spi<'static>>>,
+    console: <UartConsoleComponent as Component>::Output,
+    gpio: <GpioComponent as Component>::Output,
+    led: <LedComponent as Component>::Output,
+    alarm: <AlarmComponent as Component>::Output,
+    spi: <VirtualSpiComponent as Component>::Output,
     ipc: kernel::ipc::IPC,
 }
 
@@ -70,131 +67,31 @@ pub static FLASH_CONFIG_BYTES: [u8; 16] = [
     0xFF, 0xFF, 0xFF, 0xFF, 0xDE, 0xF9, 0xFF, 0xFF,
 ];
 
-pub unsafe fn set_pin_primary_functions() {
-    use mk66::gpio::functions::*;
-    use mk66::gpio::*;
-    PB17.claim_as(UART0_TX);
-    PB16.claim_as(UART0_RX);
-
-    PD05.claim_as(SPI1_SCK);
-    PD06.claim_as(SPI1_MOSI);
-
-    PC06.claim_as(SPI0_MOSI);
-    PC07.claim_as(SPI0_MISO);
-    PA15.claim_as(SPI0_SCK);
-}
-
 #[no_mangle]
 pub unsafe fn reset_handler() {
-    use mk66::{clock, wdog, sim, pit, uart};
-    use mk66::sim::Clock;
-    use mk66::gpio::*;
-
     // Disable the watchdog.
-    wdog::stop();
+    mk66::wdog::stop();
 
     // Relocate the text and data segments.
     mk66::init();
 
     // Configure the system clock.
-    clock::configure(120);
+    mk66::clock::configure(120);
 
     // Enable the Port Control and Interrupt clocks.
-    sim::clocks::PORTABCDE.enable();
+    use mk66::sim::Clock;
+    mk66::sim::clocks::PORTABCDE.enable();
 
-    pit::PIT.init();
-    mk66::spi::SPI0.init();
-    mk66::spi::SPI1.init();
-
-    set_pin_primary_functions();
-
-    let console = static_init!(
-            Console<uart::Uart>,
-            Console::new(&uart::UART0,
-                         115200,
-                         &mut capsules::console::WRITE_BUF,
-                         kernel::Grant::create())
-        );
-    uart::UART0.set_client(console);
-    console.initialize();
-
-    let kc = static_init!(
-            capsules::console::App,
-            capsules::console::App::default()
-        );
-    kernel::debug::assign_console_driver(Some(console), kc);
-
-    let alarm = static_init!(
-            AlarmDriver<'static, mk66::pit::Pit>,
-            AlarmDriver::new(&pit::PIT,
-                             kernel::Grant::create())
-        );
-    pit::PIT.set_client(alarm);
-
-    let mux_spi0 = static_init!(
-            MuxSpiMaster<'static, mk66::spi::Spi<'static>>,
-            MuxSpiMaster::new(&mk66::spi::SPI0)
-        );
-    let mux_spi1 = static_init!(
-            MuxSpiMaster<'static, mk66::spi::Spi<'static>>,
-            MuxSpiMaster::new(&mk66::spi::SPI1)
-        );
-
-    mk66::spi::SPI0.set_client(mux_spi0);
-    mk66::spi::SPI1.set_client(mux_spi1);
-
-    let virtual_spi = static_init!(
-            [VirtualSpiMasterDevice<'static, mk66::spi::Spi<'static>>; 2],
-            [VirtualSpiMasterDevice::new(mux_spi0, 0),
-             VirtualSpiMasterDevice::new(mux_spi1, 0)]
-
-        );
-
-    let spi = static_init!(
-            Spi<'static, VirtualSpiMasterDevice<'static, mk66::spi::Spi<'static>>>,
-            Spi::new(virtual_spi)
-        );
-
-    static mut SPI_READ_BUF: [u8; 1024] = [0; 1024];
-    static mut SPI_WRITE_BUF: [u8; 1024] = [0; 1024];
-
-    spi.config_buffers(&mut SPI_READ_BUF, &mut SPI_WRITE_BUF);
-
-    virtual_spi[0].set_client(spi);
-    virtual_spi[1].set_client(spi);
-
-    let gpio_pins = static_init!(
-        [&'static Gpio; 8],
-        [PD01.claim_as_gpio(),
-         PC00.claim_as_gpio(),
-         PB00.claim_as_gpio(),
-         PB01.claim_as_gpio(),
-         PB03.claim_as_gpio(),
-         PB02.claim_as_gpio(),
-         // PD05.claim_as_gpio(),
-         // PD06.claim_as_gpio(),
-         PC01.claim_as_gpio(),
-         PC02.claim_as_gpio()]
-        );
-
-    let gpio = static_init!(
-        GPIO<'static, Gpio>,
-        GPIO::new(gpio_pins)
-        );
-
-    for pin in gpio_pins.iter() {
-        pin.set_client(gpio);
-    }
-
-    let led_pins = static_init!(
-        [(&'static Gpio, ActivationMode); 1],
-        [(PC05.claim_as_gpio(), ActivationMode::ActiveHigh)]
-        );
-
-    let led = static_init!(
-        LED<'static, Gpio>,
-        LED::new(led_pins)
-        );
+    let (gpio_pins, led_pins) = pins::configure_all_pins(); 
+    let gpio = GpioComponent::new()
+                             .dependency(gpio_pins)
+                             .finalize().unwrap();
+    let led = LedComponent::new()
+                           .dependency(led_pins)
+                           .finalize().unwrap();
+    let spi = VirtualSpiComponent::new().finalize().unwrap();
+    let alarm = AlarmComponent::new().finalize().unwrap();
+    let console = UartConsoleComponent::new().finalize().unwrap();
 
     let teensy = Teensy {
         console: console,
