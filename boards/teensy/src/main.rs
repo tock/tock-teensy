@@ -26,7 +26,6 @@ mod spi;
 #[allow(dead_code)]
 mod components;
 
-use kernel::hil::uart::UART;
 pub mod xconsole;
 
 #[allow(dead_code)]
@@ -36,7 +35,7 @@ use components::*;
 
 #[allow(unused)]
 struct Teensy {
-    xconsole: &'static xconsole::XConsole<'static, mk66::uart::Uart>,
+    xconsole: <XConsoleComponent as Component>::Output,
     gpio: <GpioComponent as Component>::Output,
     led: <LedComponent as Component>::Output,
     alarm: <AlarmComponent as Component>::Output,
@@ -94,23 +93,7 @@ pub unsafe fn reset_handler() {
                            .finalize().unwrap();
     let spi = VirtualSpiComponent::new().finalize().unwrap();
     let alarm = AlarmComponent::new().finalize().unwrap();
-    
-    let xconsole = static_init!(
-            xconsole::XConsole<mk66::uart::Uart>,
-            xconsole::XConsole::new(&mk66::uart::UART0,
-                                    115200,
-                                    &mut xconsole::WRITE_BUF,
-                                    &mut xconsole::READ_BUF,
-                                    kernel::Grant::create())
-    );
-    mk66::uart::UART0.set_client(xconsole);
-    xconsole.initialize();
-
-    let kc = static_init!(
-            xconsole::App,
-            xconsole::App::default()
-        );
-    kernel::debug::assign_console_driver(Some(xconsole), kc);
+    let xconsole = XConsoleComponent::new().finalize().unwrap();
 
     let teensy = Teensy {
         xconsole: xconsole,
@@ -122,8 +105,6 @@ pub unsafe fn reset_handler() {
     };
 
     let mut chip = mk66::chip::MK66::new();
-    mk66::uart::UART0.enable_rx();
-    mk66::uart::UART0.enable_rx_interrupts();
 
     if tests::TEST {
         tests::test();
