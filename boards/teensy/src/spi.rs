@@ -38,7 +38,7 @@ impl Default for App {
             app_write: None,
             len: 0,
             index: 0,
-            spi_hardware: Cell::new(0)
+            spi_hardware: Cell::new(1)
         }
     }
 }

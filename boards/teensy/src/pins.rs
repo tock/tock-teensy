@@ -45,12 +45,14 @@ pub unsafe fn configure_all_pins() -> (&'static [PinHandle],
     PB16.claim_as(UART0_RX);
 
     // SPI0
+    PC04.release_claim();
     PC06.release_claim();
     PC07.release_claim();
     PA15.release_claim();
     PC06.claim_as(SPI0_MOSI);
     PC07.claim_as(SPI0_MISO);
     PA15.claim_as(SPI0_SCK);
+    PC04.claim_as(SPI0_CS0);
 
     // SPI1
     PD05.release_claim();

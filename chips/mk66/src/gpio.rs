@@ -483,6 +483,7 @@ pub mod functions {
     pub const SPI0_MOSI: Function<PinC06> = Function::new(Alt2);
     pub const SPI0_MISO: Function<PinC07> = Function::new(Alt2);
     pub const SPI0_SCK: Function<PinA15> = Function::new(Alt2);
+    pub const SPI0_CS0: Function<PinC04> = Function::new(Alt2);
 
     // SPI1
     pub const SPI1_MOSI: Function<PinD06> = Function::new(Alt7);

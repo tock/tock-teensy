@@ -84,7 +84,7 @@ pub unsafe fn reset_handler() {
     use mk66::sim::Clock;
     mk66::sim::clocks::PORTABCDE.enable();
 
-    let (gpio_pins, led_pins) = pins::configure_all_pins(); 
+    let (gpio_pins, led_pins) = pins::configure_all_pins();
     let gpio = GpioComponent::new()
                              .dependency(gpio_pins)
                              .finalize().unwrap();
