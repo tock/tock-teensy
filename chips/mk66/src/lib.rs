@@ -1,6 +1,7 @@
 #![crate_name = "mk66"]
 #![crate_type = "rlib"]
 #![feature(asm,core_intrinsics,concat_idents,const_fn,const_cell_new)]
+#![feature(i128_type)]
 #![no_std]
 
 #[allow(unused_extern_crates)]
@@ -19,6 +20,10 @@ mod regs;
 #[macro_use]
 extern crate common;
 
+extern crate sha2;
+extern crate twofish;
+extern crate block_cipher_trait;
+
 pub mod chip;
 pub mod nvic;
 pub mod wdog;
@@ -30,6 +35,8 @@ pub mod uart;
 pub mod clock;
 pub mod pit;
 pub mod spi;
+
+#[allow(while_true)]
 pub mod rnga;
 
 // TODO: Should this be moved to the cortexm crate?

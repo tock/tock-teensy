@@ -103,6 +103,7 @@ pub unsafe fn reset_handler() {
         capsules::rng::SimpleRng::new(&mk66::rnga::RNGA, kernel::Grant::create())
     );
     mk66::rnga::RNGA.set_client(rng);
+    mk66::rnga::RNGA.init();
 
     let teensy = Teensy {
         xconsole: xconsole,
