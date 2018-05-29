@@ -14,6 +14,9 @@ mod alarm;
 #[allow(dead_code)]
 mod spi;
 
+#[allow(dead_code)]
+mod rng;
+
 // Set this function to run whatever test you desire. Test functions are named XXX_test by convention.
 pub fn test() {
     spi::spi_test();
