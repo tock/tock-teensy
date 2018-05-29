@@ -49,3 +49,11 @@ Then run `make program` and the kernel will be compiled and flashed to your
 Teensy. You should see the orange LED blinking!
 
 To get a blink with UART console output on TX0, run `print::print_test()` instead.
+
+## Packages you need
+
+You'll need the ARM cross compiler on many systems:
+
+```
+sudo apt-get install gcc-arm-none-eabi
+```
