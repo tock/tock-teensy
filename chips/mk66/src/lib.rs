@@ -30,6 +30,7 @@ pub mod uart;
 pub mod clock;
 pub mod pit;
 pub mod spi;
+pub mod i2c;
 
 // TODO: Should this be moved to the cortexm crate?
 unsafe extern "C" fn unhandled_interrupt() {
