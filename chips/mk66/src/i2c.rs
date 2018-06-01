@@ -29,7 +29,7 @@ impl I2C {
         I2C {
             index: index,
             registers: I2C_BASE_ADDRS[index],
-            client: Cell::new(None),
+            //client: Cell::new(None),
             buffer: TakeCell::empty(),
             rx_len: Cell::new(0),
             rx_index: Cell::new(0),
@@ -37,7 +37,7 @@ impl I2C {
     }
 
     pub fn handle_interrupt(&self) {
-        let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
+        let _regs: &mut Registers = unsafe { mem::transmute(self.registers) };
         // Read byte from data register; reading S1 and D clears interrupt
     }
 
@@ -61,6 +61,17 @@ impl I2C {
 
 /// Implementation of kernel::hil::I2C
 impl hil::i2c::I2CMaster for I2C {
+    fn enable(&self){
+    }
+    fn disable(&self){
+    }
+    fn write_read(&self, addr: u8, data: &'static mut [u8], write_len: u8, read_len: u8){
+    }
+    fn write(&self, addr: u8, data: &'static mut [u8], len: u8){
+    }
+    fn read(&self, addr: u8, buffer: &'static mut [u8], len: u8){
+    }
+
 }
 /*
 interrupt_handler!(i2c0_handler, I2C0);
