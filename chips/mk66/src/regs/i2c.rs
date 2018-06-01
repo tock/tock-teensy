@@ -1,18 +1,18 @@
 use common::regs::{ReadWrite};
 #[repr(C, packed)]
 pub struct Registers {
-    pub  A1: ReadWrite<u8, I2CAddress>,
-    pub  F: ReadWrite<u8, MultiplierFactor>,
-    pub  C1: ReadWrite<u8, ControlRegister1>,
-    pub  S: ReadWrite<u8, StatusRegister>,
-    pub  D: ReadWrite<u8>,
-    pub  C2: ReadWrite<u8, ControlRegister2>,
-    pub  FLT: ReadWrite<u8, FltRegister>,
-    pub  RA: ReadWrite<u8, RangeAddress>,
-    pub  SMB: ReadWrite<u8, SMBusCSR>,
-    pub  A2: ReadWrite<u8, I2CAddress>,
-    pub  SLTH: ReadWrite<u8>,
-    pub  SLTL: ReadWrite<u8>
+    pub  a1: ReadWrite<u8, I2CAddress>,
+    pub  f: ReadWrite<u8, MultiplierFactor>,
+    pub  c1: ReadWrite<u8, ControlRegister1>,
+    pub  s: ReadWrite<u8, StatusRegister>,
+    pub  d: ReadWrite<u8>,
+    pub  c2: ReadWrite<u8, ControlRegister2>,
+    pub  flt: ReadWrite<u8, FltRegister>,
+    pub  ra: ReadWrite<u8, RangeAddress>,
+    pub  smb: ReadWrite<u8, SMBusCSR>,
+    pub  a2: ReadWrite<u8, I2CAddress>,
+    pub  slth: ReadWrite<u8>,
+    pub  sltl: ReadWrite<u8>
 }
 
 pub const I2C_BASE_ADDRS: [*mut Registers; 4] = [0x40066000 as *mut Registers,

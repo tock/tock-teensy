@@ -1,3 +1,4 @@
+#![allow(unused)]
 //! Implementation of the MK66 I2C
 
 use core::cell::Cell;
