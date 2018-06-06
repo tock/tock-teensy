@@ -1,5 +1,6 @@
 use kernel::Chip;
 use kernel::common::{RingBuffer, Queue};
+//use i2c;
 use nvic;
 use pit;
 use spi;
@@ -52,6 +53,7 @@ impl Chip for MK66 {
                     SPI2 => spi::SPI2.handle_interrupt(),
                     UART0 => uart::UART0.handle_interrupt(),
                     UART1 => uart::UART1.handle_interrupt(),
+//                    I2C0 => i2c::I2C1.handle_interrupt(),
                     _ => {}
                 }
 

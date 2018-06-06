@@ -35,6 +35,7 @@ pub mod uart;
 pub mod clock;
 pub mod pit;
 pub mod spi;
+pub mod i2c;
 
 #[allow(while_true)]
 pub mod rnga;
