@@ -488,6 +488,49 @@ pub mod functions {
     // SPI1
     pub const SPI1_MOSI: Function<PinD06> = Function::new(Alt7);
     pub const SPI1_SCK: Function<PinD05> = Function::new(Alt7);
+
+    // The physical i2c ports
+    // In most cases there is more than one bus per i2c
+    // controller. Which are used is selected on a per-board
+    // basis using pinmux settings.
+
+    // Through the Magic of Schematics, on the schematics all these
+    // pins have the same name: SDA0, SDA1. That's not as easy
+    // when using identifiers. Here are the pin pairs for I2Cx.
+    // These are defined in such a way that I2Cx_SDA0 is the one
+    // most likely to be used. What I'd most like to do be able
+    // to create a new symbol that matches the schematic, e.g.
+    // I2C_SDA0, in the board file, which is where we define
+    // the one we use.
+    pub const I2C0_SDA0: Function<PinB03> = Function::new(Alt2);
+    pub const I2C0_SCLK0: Function<PinB02> = Function::new(Alt2);
+    pub const I2C0_SDA1: Function<PinB01> = Function::new(Alt2);
+    pub const I2C0_SCLK1: Function<PinB00> = Function::new(Alt2);
+    pub const I2C0_SDA2: Function<PinD03> = Function::new(Alt7);
+    pub const I2C0_SCLK2: Function<PinD02> = Function::new(Alt7);
+    pub const I2C0_SDA3: Function<PinD09> = Function::new(Alt2);
+    pub const I2C0_SCLK3: Function<PinD08> = Function::new(Alt2);
+    pub const I2C0_SDA4: Function<PinE25> = Function::new(Alt5);
+    pub const I2C0_SCLK4: Function<PinE25> = Function::new(Alt5);
+
+    // I2C1
+    pub const I2C1_SDA0: Function<PinC11> = Function::new(Alt2);
+    pub const I2C1_SCLK0: Function<PinC10> = Function::new(Alt2);
+    pub const I2C1_SDA1: Function<PinE00> = Function::new(Alt6);
+    pub const I2C1_SCLK1: Function<PinE01> = Function::new(Alt6);
+
+    // I2C2
+    // This one is right off the chip docs but seems wrong to me.
+    pub const I2C2_SDA0: Function<PinA13> = Function::new(Alt5);
+    pub const I2C2_SCLK0: Function<PinA14> = Function::new(Alt5);
+    pub const I2C2_SDA1: Function<PinA11> = Function::new(Alt5);
+    pub const I2C2_SCLK1: Function<PinA12> = Function::new(Alt5);
+
+    // I2C3
+    pub const I2C3_SDA0: Function<PinE10> = Function::new(Alt2);
+    pub const I2C3_SCLK0: Function<PinE11> = Function::new(Alt2);
+    pub const I2C3_SDA1: Function<PinA01> = Function::new(Alt4);
+    pub const I2C3_SCLK1: Function<PinA02> = Function::new(Alt4);
 }
 
 interrupt_handler!(porta_interrupt, PCMA);
