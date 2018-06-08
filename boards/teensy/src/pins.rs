@@ -60,6 +60,22 @@ pub unsafe fn configure_all_pins() -> (&'static [PinHandle],
     PD05.claim_as(SPI1_SCK);
     PD06.claim_as(SPI1_MOSI);
 
+    PB03.release_claim();
+    PB02.release_claim();
+    PB03.claim_as(I2C0_SDA0);
+    PB02.claim_as(I2C0_SCLK0);
+
+    PC11.release_claim();
+    PC10.release_claim();
+    PC11.claim_as(I2C1_SDA0);
+    PC10.claim_as(I2C1_SCLK0);
+
+    PA13.release_claim();
+    PA14.release_claim();
+    PA13.claim_as(I2C2_SDA0);
+    PA14.claim_as(I2C2_SCLK0);
+
+    // I2C3 appears not to be used at all.
     (gpio_pins, led_pins)
 }
 
