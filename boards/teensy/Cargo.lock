@@ -1,14 +1,3 @@
-[root]
-name = "teensy"
-version = "0.1.0"
-dependencies = [
- "capsules 0.1.0",
- "common 0.1.0",
- "cortexm4 0.1.0",
- "kernel 0.1.0",
- "mk66 0.1.0",
-]
-
 [[package]]
 name = "arrayref"
 version = "0.3.4"
@@ -44,13 +33,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
+name = "cortexm"
 version = "0.1.0"
+dependencies = [
+ "kernel 0.1.0",
+]
 
 [[package]]
 name = "cortexm4"
 version = "0.1.0"
 dependencies = [
+ "cortexm 0.1.0",
  "kernel 0.1.0",
 ]
 
@@ -78,6 +71,9 @@ dependencies = [
 [[package]]
 name = "kernel"
 version = "0.1.0"
+dependencies = [
+ "tock-regs 0.1.0",
+]
 
 [[package]]
 name = "mk66"
@@ -85,7 +81,6 @@ version = "0.1.0"
 dependencies = [
  "block-cipher-trait 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "capsules 0.1.0",
- "common 0.1.0",
  "cortexm4 0.1.0",
  "kernel 0.1.0",
  "sha2 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -107,6 +102,20 @@ dependencies = [
  "digest 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "teensy"
+version = "0.1.0"
+dependencies = [
+ "capsules 0.1.0",
+ "cortexm4 0.1.0",
+ "kernel 0.1.0",
+ "mk66 0.1.0",
+]
+
+[[package]]
+name = "tock-regs"
+version = "0.1.0"
 
 [[package]]
 name = "twofish"

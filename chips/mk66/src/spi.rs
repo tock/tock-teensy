@@ -1,7 +1,7 @@
 use regs::spi::*;
 use kernel::hil::spi::*;
 use kernel::ReturnCode;
-use kernel::common::take_cell::TakeCell;
+use kernel::common::cells::TakeCell;
 use core::cell::Cell;
 use core::mem;
 use clock;
@@ -49,24 +49,24 @@ impl<'a> Spi<'a> {
     }
 
     pub fn enable(&self) {
-        self.regs().mcr.modify(MCR::MDIS::CLEAR);
+        self.regs().mcr.modify(ModuleConfiguration::MDIS::CLEAR);
     }
 
     pub fn disable(&self) {
-        self.regs().mcr.modify(MCR::MDIS::SET);
+        self.regs().mcr.modify(ModuleConfiguration::MDIS::SET);
     }
 
     pub fn is_running(&self) -> bool {
-        self.regs().sr.is_set(SR::TXRS)
+        self.regs().sr.is_set(Status::TXRS)
     }
 
     pub fn halt(&self) {
-        self.regs().mcr.modify(MCR::HALT::SET);
+        self.regs().mcr.modify(ModuleConfiguration::HALT::SET);
         while self.is_running() {}
     }
 
     pub fn resume(&self) {
-        self.regs().mcr.modify(MCR::HALT::CLEAR);
+        self.regs().mcr.modify(ModuleConfiguration::HALT::CLEAR);
     }
 
     fn enable_clock(&self) {
@@ -87,10 +87,10 @@ impl<'a> Spi<'a> {
         self.halt();
         match role {
             SpiRole::Master => {
-                self.regs().mcr.modify(MCR::MSTR::Master);
+                self.regs().mcr.modify(ModuleConfiguration::MSTR::Master);
             },
             SpiRole::Slave => {
-                self.regs().mcr.modify(MCR::MSTR::Slave);
+                self.regs().mcr.modify(ModuleConfiguration::MSTR::Slave);
             }
         }
         self.resume();
@@ -98,8 +98,8 @@ impl<'a> Spi<'a> {
 
     fn set_polarity(&self, polarity: ClockPolarity) {
         let cpol = match polarity {
-            ClockPolarity::IdleHigh => CTAR::CPOL::IdleHigh,
-            ClockPolarity::IdleLow => CTAR::CPOL::IdleLow
+            ClockPolarity::IdleHigh => ClockAndTransferAttributes::CPOL::IdleHigh,
+            ClockPolarity::IdleLow => ClockAndTransferAttributes::CPOL::IdleLow
         };
         self.halt();
         self.regs().ctar0.modify(cpol);
@@ -107,7 +107,7 @@ impl<'a> Spi<'a> {
     }
 
     fn get_polarity(&self) -> ClockPolarity {
-        if self.regs().ctar0.matches(CTAR::CPOL::IdleHigh) {
+        if self.regs().ctar0.matches_all(ClockAndTransferAttributes::CPOL::IdleHigh) {
             ClockPolarity::IdleHigh
         } else {
             ClockPolarity::IdleLow
@@ -116,8 +116,8 @@ impl<'a> Spi<'a> {
 
     fn set_phase(&self, phase: ClockPhase) {
         let cpha = match phase {
-            ClockPhase::SampleLeading => CTAR::CPHA::SampleLeading,
-            ClockPhase::SampleTrailing => CTAR::CPHA::SampleTrailing
+            ClockPhase::SampleLeading => ClockAndTransferAttributes::CPHA::SampleLeading,
+            ClockPhase::SampleTrailing => ClockAndTransferAttributes::CPHA::SampleTrailing
         };
         self.halt();
         self.regs().ctar0.modify(cpha);
@@ -125,7 +125,7 @@ impl<'a> Spi<'a> {
     }
 
     fn get_phase(&self) -> ClockPhase {
-        if self.regs().ctar0.matches(CTAR::CPHA::SampleLeading) {
+        if self.regs().ctar0.matches_all(ClockAndTransferAttributes::CPHA::SampleLeading) {
             ClockPhase::SampleLeading
         } else {
             ClockPhase::SampleTrailing
@@ -134,8 +134,8 @@ impl<'a> Spi<'a> {
 
     pub fn set_data_order(&self, order: DataOrder) {
         let order = match order {
-            DataOrder::LSBFirst => CTAR::LSBFE::LsbFirst,
-            DataOrder::MSBFirst => CTAR::LSBFE::MsbFirst
+            DataOrder::LSBFirst => ClockAndTransferAttributes::LSBFE::LsbFirst,
+            DataOrder::MSBFirst => ClockAndTransferAttributes::LSBFE::MsbFirst
         };
         self.halt();
         self.regs().ctar0.modify(order);
@@ -143,7 +143,7 @@ impl<'a> Spi<'a> {
     }
 
     pub fn get_data_order(&self) -> DataOrder {
-        if self.regs().ctar0.matches(CTAR::LSBFE::LsbFirst) {
+        if self.regs().ctar0.matches_all(ClockAndTransferAttributes::LSBFE::LsbFirst) {
             DataOrder::LSBFirst
         } else {
             DataOrder::MSBFirst
@@ -170,22 +170,22 @@ impl<'a> Spi<'a> {
 
     fn flush_tx_fifo(&self) {
         self.halt();
-        self.regs().mcr.modify(MCR::CLR_TXF::SET);
+        self.regs().mcr.modify(ModuleConfiguration::CLR_TXF::SET);
         self.resume();
     }
 
     fn flush_rx_fifo(&self) {
         self.halt();
-        self.regs().mcr.modify(MCR::CLR_RXF::SET);
+        self.regs().mcr.modify(ModuleConfiguration::CLR_RXF::SET);
         self.resume();
     }
 
     fn tx_fifo_ready(&self) -> bool {
-        !(self.regs().sr.read(SR::TXCTR) >= self.fifo_depth())
+        !(self.regs().sr.read(Status::TXCTR) >= self.fifo_depth())
     }
 
     fn rx_fifo_ready(&self) -> bool {
-        self.regs().sr.read(SR::RXCTR) > 0
+        self.regs().sr.read(Status::RXCTR) > 0
     }
 
     fn baud_rate(dbl: u32, prescaler: u32, scaler: u32) -> u32 {
@@ -234,16 +234,16 @@ impl<'a> Spi<'a> {
         }
 
         self.halt();
-        self.regs().ctar0.modify(CTAR::DBR.val(dbl as u32) +
-                                 CTAR::PBR.val(prescaler as u32) +
-                                 CTAR::BR.val(scaler as u32));
+        self.regs().ctar0.modify(ClockAndTransferAttributes::DBR.val(dbl as u32) +
+                                 ClockAndTransferAttributes::PBR.val(prescaler as u32) +
+                                 ClockAndTransferAttributes::BR.val(scaler as u32));
         self.resume();
 
         Spi::baud_rate(dbls[dbl], prescalers[prescaler], scalers[scaler])
     }
 
     fn get_baud_rate(&self) -> u32 {
-        let prescaler = match self.regs().ctar0.read(CTAR::PBR) {
+        let prescaler = match self.regs().ctar0.read(ClockAndTransferAttributes::PBR) {
             0 => 2,
             1 => 3,
             2 => 5,
@@ -251,34 +251,34 @@ impl<'a> Spi<'a> {
             _ => panic!("Impossible value for baud rate field!")
         };
 
-        let scaler = match self.regs().ctar0.read(CTAR::BR) {
+        let scaler = match self.regs().ctar0.read(ClockAndTransferAttributes::BR) {
             0 => 2,
             1 => 4,
             2 => 6,
             s @ _ => 1 << s
         };
 
-        let dbl = self.regs().ctar0.read(CTAR::DBR);
+        let dbl = self.regs().ctar0.read(ClockAndTransferAttributes::DBR);
 
         Spi::baud_rate(dbl, prescaler, scaler)
     }
 
     pub fn transfer_count(&self) -> u32 {
-        self.regs().sr.read(SR::TXCTR)
+        self.regs().sr.read(Status::TXCTR)
     }
 
     pub fn start_of_queue(&self) {
-        self.regs().pushr_cmd.modify(PUSHR_CMD::EOQ::CLEAR);
+        self.regs().pushr_cmd.modify(TxFifoPushCommand::EOQ::CLEAR);
     }
 
     fn end_of_queue(&self) {
-        self.regs().pushr_cmd.modify(PUSHR_CMD::EOQ::SET);
+        self.regs().pushr_cmd.modify(TxFifoPushCommand::EOQ::SET);
     }
 
     fn configure_timing(&self) {
         self.halt();
         // Set maximum delay after transfer.
-        self.regs().ctar0.modify(CTAR::DT.val(0x0) + CTAR::PDT::Delay7);
+        self.regs().ctar0.modify(ClockAndTransferAttributes::DT.val(0x0) + ClockAndTransferAttributes::PDT::Delay7);
         self.resume();
     }
 
@@ -286,7 +286,7 @@ impl<'a> Spi<'a> {
         if size > 16 || size < 4 { return }
 
         self.halt();
-        self.regs().ctar0.modify(CTAR::FMSZ.val(size - 1));
+        self.regs().ctar0.modify(ClockAndTransferAttributes::FMSZ.val(size - 1));
         self.resume();
     }
 
@@ -302,7 +302,7 @@ impl<'a> Spi<'a> {
         unsafe {
             nvic::enable(idx);
         }
-        self.regs().rser.modify(RSER::EOQF_RE::SET);
+        self.regs().rser.modify(RequestSelectAndEnable::EOQF_RE::SET);
         self.resume();
     }
 
@@ -310,8 +310,8 @@ impl<'a> Spi<'a> {
         // TODO: Determine why the extra interrupt is called
 
         // End of transfer
-        if self.regs().sr.is_set(SR::EOQF) {
-            self.regs().sr.modify(SR::EOQF::SET);
+        if self.regs().sr.is_set(Status::EOQF) {
+            self.regs().sr.modify(Status::EOQF::SET);
 
             self.client.get().map(|client| {
                 match self.write.take() {
@@ -341,8 +341,8 @@ impl<'a> SpiMaster for Spi<'a> {
 
         self.set_frame_size(8);
         self.configure_timing();
-        self.regs().mcr.modify(MCR::PCSIS::AllInactiveHigh);
-        self.regs().pushr_cmd.modify(PUSHR_CMD::PCS.val(0));
+        self.regs().mcr.modify(ModuleConfiguration::PCSIS::AllInactiveHigh);
+        self.regs().pushr_cmd.modify(TxFifoPushCommand::PCS.val(0));
     }
 
     fn is_busy(&self) -> bool {
@@ -418,7 +418,7 @@ impl<'a> SpiMaster for Spi<'a> {
         }
 
         // The PCS field is one-hot (the way this interface uses it).
-        let pcs = self.regs().pushr_cmd.read(PUSHR_CMD::PCS);
+        let pcs = self.regs().pushr_cmd.read(TxFifoPushCommand::PCS);
         let old_cs = match pcs {
             0 | 0b000001 => 0,
             0b000010 => 1,
@@ -436,7 +436,7 @@ impl<'a> SpiMaster for Spi<'a> {
         self.chip_select_settings[old_cs].set(self.regs().ctar0.get());
         self.regs().ctar0.set(self.chip_select_settings[new_cs].get());
         self.resume();
-        self.regs().pushr_cmd.modify(PUSHR_CMD::PCS.val(1 << new_cs));
+        self.regs().pushr_cmd.modify(TxFifoPushCommand::PCS.val(1 << new_cs));
     }
 
     /// Returns the actual rate set
@@ -474,14 +474,10 @@ impl<'a> SpiMaster for Spi<'a> {
     // CS line is high or low, such that it can issue multi-byte
     // requests with single byte operations.
     fn hold_low(&self) {
-        self.regs().pushr_cmd.modify(PUSHR_CMD::CONT::ChipSelectInactiveBetweenTxfers);
+        self.regs().pushr_cmd.modify(TxFifoPushCommand::CONT::ChipSelectInactiveBetweenTxfers);
     }
 
     fn release_low(&self) {
-        self.regs().pushr_cmd.modify(PUSHR_CMD::CONT::ChipSelectAssertedBetweenTxfers);
+        self.regs().pushr_cmd.modify(TxFifoPushCommand::CONT::ChipSelectAssertedBetweenTxfers);
     }
 }
-
-interrupt_handler!(spi0_interrupt_handler, SPI0);
-interrupt_handler!(spi1_interrupt_handler, SPI1);
-interrupt_handler!(spi2_interrupt_handler, SPI2);

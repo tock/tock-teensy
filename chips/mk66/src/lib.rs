@@ -1,24 +1,17 @@
 #![crate_name = "mk66"]
 #![crate_type = "rlib"]
 #![feature(asm,core_intrinsics,concat_idents,const_fn,const_cell_new)]
-#![feature(i128_type)]
 #![no_std]
 
 #[allow(unused_extern_crates)]
 extern crate cortexm4;
 
 #[allow(unused_imports)]
-#[macro_use(debug)]
+#[macro_use(debug, register_bitfields, register_bitmasks)]
 extern crate kernel;
-
-#[macro_use]
-mod helpers;
 
 #[allow(dead_code)]
 mod regs;
-
-#[macro_use]
-extern crate common;
 
 extern crate sha2;
 extern crate twofish;
@@ -38,6 +31,8 @@ pub mod spi;
 
 #[allow(while_true)]
 pub mod rnga;
+
+use cortexm4::{generic_isr, svc_handler, systick_handler};
 
 // TODO: Should this be moved to the cortexm crate?
 unsafe extern "C" fn unhandled_interrupt() {
@@ -65,12 +60,6 @@ extern "C" {
     // Defined by platform
     fn reset_handler();
 
-    // Defined in src/arch/cortex-m4/ctx_switch.S
-    fn SVC_Handler();
-    fn systick_handler();
-
-    fn generic_isr();
-
     static mut _szero: u32;
     static mut _ezero: u32;
     static mut _etext: u32;
@@ -80,134 +69,28 @@ extern "C" {
 
 // Cortex-M core interrupt vectors
 #[link_section=".vectors"]
-#[cfg_attr(rustfmt, rustfmt_skip)]
 // no_mangle ensures that the symbol is kept until the final binary
 #[no_mangle]
 pub static BASE_VECTORS: [unsafe extern fn(); 16] = [
     _estack, reset_handler,
-    /* NMI */        unhandled_interrupt,
-    /* Hard Fault */ hard_fault_handler,
-    /* MemManage */  unhandled_interrupt,
-    /* BusFault */   unhandled_interrupt,
-    /* UsageFault */ unhandled_interrupt,
+    unhandled_interrupt, // NMI
+    hard_fault_handler, // Hard Fault
+    unhandled_interrupt, // MemManage
+    unhandled_interrupt, // BusFault
+    unhandled_interrupt, // UsageFault
     unhandled_interrupt, unhandled_interrupt, unhandled_interrupt,
     unhandled_interrupt,
-    /* SVC */        SVC_Handler,
-    /* DebugMon */   unhandled_interrupt,
+    svc_handler, // SVC
+    unhandled_interrupt, // DebugMon
     unhandled_interrupt,
-    /* PendSV */     unhandled_interrupt,
-    /* SysTick */    systick_handler
+    unhandled_interrupt, // PendSV
+    systick_handler // SysTick
 ];
 
 #[link_section=".vectors"]
 // no_mangle ensures that the symbol is kept until the final binary
 #[no_mangle]
 pub static IRQS: [unsafe extern "C" fn(); 100] = [generic_isr; 100];
-
-#[no_mangle]
-#[cfg_attr(rustfmt, rustfmt_skip)]
-pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 100] = [
-    /* DMA0 */          Option::Some(unhandled_interrupt),
-    /* DMA1 */          Option::Some(unhandled_interrupt),
-    /* DMA2 */          Option::Some(unhandled_interrupt),
-    /* DMA3 */          Option::Some(unhandled_interrupt),
-    /* DMA4 */          Option::Some(unhandled_interrupt),
-    /* DMA5 */          Option::Some(unhandled_interrupt),
-    /* DMA6 */          Option::Some(unhandled_interrupt),
-    /* DMA7 */          Option::Some(unhandled_interrupt),
-    /* DMA8 */          Option::Some(unhandled_interrupt),
-    /* DMA9 */          Option::Some(unhandled_interrupt),
-    /* DMA10 */         Option::Some(unhandled_interrupt),
-    /* DMA11 */         Option::Some(unhandled_interrupt),
-    /* DMA12 */         Option::Some(unhandled_interrupt),
-    /* DMA13 */         Option::Some(unhandled_interrupt),
-    /* DMA14 */         Option::Some(unhandled_interrupt),
-    /* DMA15 */         Option::Some(unhandled_interrupt),
-    /* DMAERR */        Option::Some(unhandled_interrupt),
-    /* MCM */           Option::Some(unhandled_interrupt),
-    /* FLASHCC */       Option::Some(unhandled_interrupt),
-    /* FLASHRC */       Option::Some(unhandled_interrupt),
-    /* MODECTRL */      Option::Some(unhandled_interrupt),
-    /* LLWU */          Option::Some(unhandled_interrupt),
-    /* WDOG */          Option::Some(unhandled_interrupt),
-    /* RNG */           Option::Some(unhandled_interrupt),
-    /* I2C0 */          Option::Some(unhandled_interrupt),
-    /* I2C1 */          Option::Some(unhandled_interrupt),
-    /* SPI0 */          Option::Some(spi::spi0_interrupt_handler),
-    /* SPI1 */          Option::Some(spi::spi1_interrupt_handler),
-    /* I2S0_TX */       Option::Some(unhandled_interrupt),
-    /* I2S0_RX */       Option::Some(unhandled_interrupt),
-    /* _RESERVED0 */    Option::Some(unhandled_interrupt),
-    /* UART0 */         Option::Some(uart::uart0_handler),
-    /* UART0_ERR */     Option::Some(unhandled_interrupt),
-    /* UART1 */         Option::Some(uart::uart1_handler),
-    /* UART1_ERR */     Option::Some(unhandled_interrupt),
-    /* UART2 */         Option::Some(unhandled_interrupt),
-    /* UART2_ERR */     Option::Some(unhandled_interrupt),
-    /* UART3 */         Option::Some(unhandled_interrupt),
-    /* UART3_ERR */     Option::Some(unhandled_interrupt),
-    /* ADC0 */          Option::Some(unhandled_interrupt),
-    /* CMP0 */          Option::Some(unhandled_interrupt),
-    /* CMP1 */          Option::Some(unhandled_interrupt),
-    /* FTM0 */          Option::Some(unhandled_interrupt),
-    /* FTM1 */          Option::Some(unhandled_interrupt),
-    /* FTM2 */          Option::Some(unhandled_interrupt),
-    /* CMT */           Option::Some(unhandled_interrupt),
-    /* RTC_ALARM */     Option::Some(unhandled_interrupt),
-    /* RTC_SECONDS */   Option::Some(unhandled_interrupt),
-    /* PIT0 */          Option::Some(unhandled_interrupt),
-    /* PIT1 */          Option::Some(unhandled_interrupt),
-    /* PIT2 */          Option::Some(pit::pit2_handler),
-    /* PIT3 */          Option::Some(unhandled_interrupt),
-    /* PDB */           Option::Some(unhandled_interrupt),
-    /* USBFS_OTG */     Option::Some(unhandled_interrupt),
-    /* USBFS_CHARGE */  Option::Some(unhandled_interrupt),
-    /* _RESERVED1 */    Option::Some(unhandled_interrupt),
-    /* DAC0 */          Option::Some(unhandled_interrupt),
-    /* MCG */           Option::Some(unhandled_interrupt),
-    /* LOWPOWERTIMER */ Option::Some(unhandled_interrupt),
-    /* PCMA */          Option::Some(gpio::porta_interrupt),
-    /* PCMB */          Option::Some(gpio::portb_interrupt),
-    /* PCMC */          Option::Some(gpio::portc_interrupt),
-    /* PCMD */          Option::Some(gpio::portd_interrupt),
-    /* PCME */          Option::Some(gpio::porte_interrupt),
-    /* SOFTWARE */      Option::Some(unhandled_interrupt),
-    /* SPI2 */          Option::Some(spi::spi2_interrupt_handler),
-    /* UART4 */         Option::Some(unhandled_interrupt),
-    /* UART4_ERR */     Option::Some(unhandled_interrupt),
-    /* _RESERVED2 */    Option::Some(unhandled_interrupt),
-    /* _RESERVED3 */    Option::Some(unhandled_interrupt),
-    /* CMP2 */          Option::Some(unhandled_interrupt),
-    /* FTM3 */          Option::Some(unhandled_interrupt),
-    /* DAC1 */          Option::Some(unhandled_interrupt),
-    /* ADC1 */          Option::Some(unhandled_interrupt),
-    /* I2C2 */          Option::Some(unhandled_interrupt),
-    /* CAN0_MSGBUF */   Option::Some(unhandled_interrupt),
-    /* CAN0_BUSOFF */   Option::Some(unhandled_interrupt),
-    /* CAN0_ERR */      Option::Some(unhandled_interrupt),
-    /* CAN0_TX */       Option::Some(unhandled_interrupt),
-    /* CAN0_RX */       Option::Some(unhandled_interrupt),
-    /* CAN0_WKUP */     Option::Some(unhandled_interrupt),
-    /* SDHC */          Option::Some(unhandled_interrupt),
-    /* EMAC_TIMER */    Option::Some(unhandled_interrupt),
-    /* EMAC_TX */       Option::Some(unhandled_interrupt),
-    /* EMAC_RX */       Option::Some(unhandled_interrupt),
-    /* EMAC_ERR */      Option::Some(unhandled_interrupt),
-    /* LPUART0 */       Option::Some(unhandled_interrupt),
-    /* TSI0 */          Option::Some(unhandled_interrupt),
-    /* TPM1 */          Option::Some(unhandled_interrupt),
-    /* TPM2 */          Option::Some(unhandled_interrupt),
-    /* USBHS */         Option::Some(unhandled_interrupt),
-    /* I2C3 */          Option::Some(unhandled_interrupt),
-    /* CMP3 */          Option::Some(unhandled_interrupt),
-    /* USBHS_OTG */     Option::Some(unhandled_interrupt),
-    /* CAN1_MSBBUF */   Option::Some(unhandled_interrupt),
-    /* CAN1_BUSOFF */   Option::Some(unhandled_interrupt),
-    /* CAN1_ERR */      Option::Some(unhandled_interrupt),
-    /* CAN1_TX */       Option::Some(unhandled_interrupt),
-    /* CAN1_RX */       Option::Some(unhandled_interrupt),
-    /* CAN1_WKUP */     Option::Some(unhandled_interrupt),
-];
 
 pub unsafe fn init() {
     // TODO: Enable the FPU (SCB_CPACR) and LMEM_PCCCR.
@@ -365,7 +248,7 @@ unsafe extern "C" fn hard_fault_handler() {
                ici_it,
                thumb_bit,
                exception_number,
-               kernel::process::ipsr_isr_number_to_str(exception_number),
+               cortexm4::ipsr_isr_number_to_str(exception_number),
                faulting_stack as u32,
                (_estack as *const ()) as u32,
                (&_ezero as *const u32) as u32,

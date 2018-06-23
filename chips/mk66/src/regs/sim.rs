@@ -1,6 +1,6 @@
-use common::regs::{ReadWrite, ReadOnly};
+use kernel::common::regs::{ReadWrite, ReadOnly};
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct Registers {
     pub sopt2: ReadWrite<u32>,
     _reserved0: ReadWrite<u32>,
@@ -11,14 +11,14 @@ pub struct Registers {
     pub sopt8: ReadWrite<u32>,
     pub sopt9: ReadWrite<u32>,
     pub sdid: ReadOnly<u32>,
-    pub scgc1: ReadWrite<u32, SystemClockGatingControl1>,
-    pub scgc2: ReadWrite<u32, SystemClockGatingControl2>,
-    pub scgc3: ReadWrite<u32, SystemClockGatingControl3>,
-    pub scgc4: ReadWrite<u32, SystemClockGatingControl4>,
-    pub scgc5: ReadWrite<u32, SystemClockGatingControl5>,
-    pub scgc6: ReadWrite<u32, SystemClockGatingControl6>,
-    pub scgc7: ReadWrite<u32, SystemClockGatingControl7>,
-    pub clkdiv1: ReadWrite<u32, ClockDivider1>,
+    pub scgc1: ReadWrite<u32, SystemClockGatingControl1::Register>,
+    pub scgc2: ReadWrite<u32, SystemClockGatingControl2::Register>,
+    pub scgc3: ReadWrite<u32, SystemClockGatingControl3::Register>,
+    pub scgc4: ReadWrite<u32, SystemClockGatingControl4::Register>,
+    pub scgc5: ReadWrite<u32, SystemClockGatingControl5::Register>,
+    pub scgc6: ReadWrite<u32, SystemClockGatingControl6::Register>,
+    pub scgc7: ReadWrite<u32, SystemClockGatingControl7::Register>,
+    pub clkdiv1: ReadWrite<u32, ClockDivider1::Register>,
     pub clkdiv2: ReadWrite<u32>,
     pub fcfg1: ReadOnly<u32>,
     pub fcfg2: ReadOnly<u32>,
@@ -32,13 +32,13 @@ pub struct Registers {
 
 pub const SIM: *mut Registers = 0x40048004 as *mut Registers;
 
-bitfields![u32,
-    SCGC1 SystemClockGatingControl1 [
+register_bitfields![u32,
+    SystemClockGatingControl1 [
         UART4 10,
         I2C3 7,
         I2C2 6
     ],
-    SCGC2 SystemClockGatingControl2 [
+    SystemClockGatingControl2 [
         DAC1 13,
         DAC0 12,
         TPM2 10,
@@ -46,7 +46,7 @@ bitfields![u32,
         LPUART0 4,
         ENET 0
     ],
-    SCGC3 SystemClockGatingControl3 [
+    SystemClockGatingControl3 [
         ADC1 27,
         FTM3 25,
         FTM2 24,
@@ -58,7 +58,7 @@ bitfields![u32,
         USBHS 1,
         RNGA 0
     ],
-    SCGC4 SystemClockGatingControl4 [
+    SystemClockGatingControl4 [
         VREF 20,
         CMP 19,
         USBOTG 18,
@@ -71,8 +71,8 @@ bitfields![u32,
         CMT 2,
         EWM 1
     ],
-    SCGC5 SystemClockGatingControl5 [
-        PORT (9, Mask(0b11111)) [
+    SystemClockGatingControl5 [
+        PORT OFFSET(9) NUMBITS(5) [
             All = 0b11111,
             A = 0b1,
             B = 0b10,
@@ -80,10 +80,10 @@ bitfields![u32,
             D = 0b1000,
             E = 0b10000
         ],
-        TSI 5 [],
-        LPTMR 0 []
+        TSI OFFSET(5) NUMBITS(1) [],
+        LPTMR OFFSET(0) NUMBITS(1) []
     ],
-    SCGC6 SystemClockGatingControl6 [
+    SystemClockGatingControl6 [
         DAC0 0,
         RTC 29,
         ADC0 27,
@@ -102,16 +102,16 @@ bitfields![u32,
         DMAMUX 1,
         FTF 0
     ],
-    SCGC7 SystemClockGatingControl7 [
+    SystemClockGatingControl7 [
         SDRAMC 3,
         MPU 2,
         DMA 1,
         FLEXBUS 0
     ],
-    CLKDIV1 ClockDivider1 [
-        Core (28, Mask(0b1111)) [],
-        Bus (24, Mask(0b1111)) [],
-        FlexBus (20, Mask(0b1111)) [],
-        Flash (16, Mask(0b1111)) []
+    ClockDivider1 [
+        Core OFFSET(28) NUMBITS(4) [],
+        Bus OFFSET(24) NUMBITS(4) [],
+        FlexBus OFFSET(20) NUMBITS(4) [],
+        Flash OFFSET(16) NUMBITS(4) []
     ]
 ];

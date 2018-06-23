@@ -1,8 +1,8 @@
-use common::regs::{ReadWrite, ReadOnly};
+use kernel::common::regs::{ReadWrite, ReadOnly};
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct Registers {
-    pub mcr: ReadWrite<u32, ModuleControl>,
+    pub mcr: ReadWrite<u32, ModuleControl::Register>,
     _reserved0: [ReadOnly<u32>; 55],
     pub ltmr64h: ReadOnly<u32>,
     pub ltmr64l: ReadOnly<u32>,
@@ -10,25 +10,25 @@ pub struct Registers {
     pub timers: [PitRegisters; 4]
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct PitRegisters {
-    pub ldval: ReadWrite<u32>, 
+    pub ldval: ReadWrite<u32>,
     pub cval: ReadOnly<u32>,
-    pub tctrl: ReadWrite<u32, TimerControl>,
-    pub tflg: ReadWrite<u32, TimerFlag>
+    pub tctrl: ReadWrite<u32, TimerControl::Register>,
+    pub tflg: ReadWrite<u32, TimerFlag::Register>
 }
 
-bitfields! [u32,
-    MCR ModuleControl [
+register_bitfields! [u32,
+    ModuleControl [
         MDIS 1,
         FRZ 0
     ],
-    TCTRL TimerControl [
+    TimerControl [
         CHN 2,
         TIE 1,
         TEN 0
     ],
-    TFLG TimerFlag [
+    TimerFlag [
         TIF 0
     ]
 ];

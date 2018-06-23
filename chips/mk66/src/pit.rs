@@ -24,17 +24,17 @@ impl<'a> Pit<'a> {
         use sim::{clocks, Clock};
 
         clocks::PIT.enable();
-        self.regs().mcr.write(MCR::MDIS::CLEAR +
-                              MCR::FRZ::SET);
+        self.regs().mcr.write(ModuleControl::MDIS::CLEAR +
+                              ModuleControl::FRZ::SET);
 
         // Configure the lifetime timer.
         self.pit(0).ldval.set(0xFFFF_FFFF);
         self.pit(1).ldval.set(0xFFFF_FFFF);
-        self.pit(1).tctrl.modify(TCTRL::CHN::SET);
+        self.pit(1).tctrl.modify(TimerControl::CHN::SET);
 
         // Enable the lifetime timer.
-        self.pit(1).tctrl.modify(TCTRL::TEN::SET);
-        self.pit(0).tctrl.modify(TCTRL::TEN::SET);
+        self.pit(1).tctrl.modify(TimerControl::TEN::SET);
+        self.pit(0).tctrl.modify(TimerControl::TEN::SET);
     }
 
     fn regs(&self) -> &mut Registers {
@@ -46,16 +46,16 @@ impl<'a> Pit<'a> {
     }
 
     pub fn enable(&self) {
-        self.pit(2).tctrl.modify(TCTRL::TEN::SET);
+        self.pit(2).tctrl.modify(TimerControl::TEN::SET);
     }
 
     pub fn is_enabled(&self) -> bool {
-        self.pit(2).tctrl.is_set(TCTRL::TEN)
+        self.pit(2).tctrl.is_set(TimerControl::TEN)
     }
 
     pub fn enable_interrupt(&self) {
         unsafe { nvic::enable(nvic::NvicIdx::PIT2); }
-        self.pit(2).tctrl.modify(TCTRL::TIE::SET);
+        self.pit(2).tctrl.modify(TimerControl::TIE::SET);
     }
 
     pub fn set_counter(&self, value: u32) {
@@ -67,16 +67,16 @@ impl<'a> Pit<'a> {
     }
 
     pub fn clear_pending(&self) {
-        self.pit(2).tflg.modify(TFLG::TIF::SET);
+        self.pit(2).tflg.modify(TimerFlag::TIF::SET);
         unsafe { nvic::clear_pending(nvic::NvicIdx::PIT2); }
     }
 
     pub fn disable(&self) {
-        self.pit(2).tctrl.modify(TCTRL::TEN::CLEAR);
+        self.pit(2).tctrl.modify(TimerControl::TEN::CLEAR);
     }
 
     pub fn disable_interrupt(&self) {
-        self.pit(2).tctrl.modify(TCTRL::TIE::CLEAR);
+        self.pit(2).tctrl.modify(TimerControl::TIE::CLEAR);
     }
 
     pub fn set_client(&self, client: &'a Client) {
@@ -129,5 +129,3 @@ impl<'a> Alarm for Pit<'a> {
         self.alarm.get()
     }
 }
-
-interrupt_handler!(pit2_handler, PIT2);

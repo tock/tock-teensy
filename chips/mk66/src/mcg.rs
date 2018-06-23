@@ -5,9 +5,9 @@ use ::core::mem;
 
 use regs::mcg::*;
 
-pub use self::C1::CLKS::Value as OscSource;
-pub use self::C1::FRDIV::Value as Frdiv;
-pub use self::C2::RANGE::Value as OscRange;
+pub use self::Control1::CLKS::Value as OscSource;
+pub use self::Control1::FRDIV::Value as Frdiv;
+pub use self::Control2::RANGE::Value as OscRange;
 
 pub enum State {
     Fei(Fei),
@@ -33,15 +33,15 @@ pub struct Pbe;
 pub fn state() -> State {
     let mcg: &mut Registers = unsafe { mem::transmute(MCG) };
 
-    let clks: OscSource = match mcg.c1.read(C1::CLKS) {
+    let clks: OscSource = match mcg.c1.read(Control1::CLKS) {
         1 => OscSource::Internal,
         2 => OscSource::External,
         _ => OscSource::LockedLoop
     };
 
-    let irefs = mcg.c1.is_set(C1::IREFS);
-    let plls = mcg.c6.is_set(C6::PLLS);
-    let lp = mcg.c2.is_set(C2::LP);
+    let irefs = mcg.c1.is_set(Control1::IREFS);
+    let plls = mcg.c6.is_set(Control6::PLLS);
+    let lp = mcg.c2.is_set(Control2::LP);
 
     match (clks, irefs, plls, lp) {
         (OscSource::LockedLoop, true, false, _) => State::Fei(Fei),
@@ -57,7 +57,7 @@ pub fn state() -> State {
 }
 
 pub struct Xtal {
-    pub range: OscRange, 
+    pub range: OscRange,
     pub frdiv: Frdiv,
     pub load: ::osc::OscCapacitance
 }
@@ -67,8 +67,8 @@ pub mod xtals {
     use osc::OscCapacitance;
 
     #[allow(non_upper_case_globals)]
-    pub const Teensy16MHz: Xtal = Xtal { 
-        range: OscRange::VeryHigh, 
+    pub const Teensy16MHz: Xtal = Xtal {
+        range: OscRange::VeryHigh,
         frdiv: Frdiv::Low16_High512,
         load: OscCapacitance::Load_10pF
     };
@@ -79,16 +79,16 @@ impl Fei {
     pub fn use_xtal(self, xtal: Xtal) -> Fbe {
         let mcg: &mut Registers = unsafe { mem::transmute(MCG) };
 
-        mcg.c2.modify(C2::RANGE.val(xtal.range as u8) +
-                      C2::EREFS::SET);
+        mcg.c2.modify(Control2::RANGE.val(xtal.range as u8) +
+                      Control2::EREFS::SET);
 
-        mcg.c1.write(C1::CLKS::External +
-                     C1::FRDIV.val(xtal.frdiv as u8) +
-                     C1::IREFS::CLEAR);
+        mcg.c1.write(Control1::CLKS::External +
+                     Control1::FRDIV.val(xtal.frdiv as u8) +
+                     Control1::IREFS::CLEAR);
 
-        while !mcg.s.matches(S::OSCINIT0::SET + 
-                             S::IREFST::CLEAR + 
-                             S::CLKST::External) {}
+        while !mcg.s.matches_all(Status::OSCINIT0::SET +
+                             Status::IREFST::CLEAR +
+                             Status::CLKST::External) {}
 
         Fbe { }
     }
@@ -105,13 +105,13 @@ impl Fbe {
             panic!("Invalid PLL reference divide factor: {}", divider);
         }
 
-        mcg.c5.modify(C5::PRDIV.val(divider - 1));
+        mcg.c5.modify(Control5::PRDIV.val(divider - 1));
 
-        mcg.c6.modify(C6::VDIV.val(multiplier - 16) +
-                      C6::PLLS::SET);
+        mcg.c6.modify(Control6::VDIV.val(multiplier - 16) +
+                      Control6::PLLS::SET);
 
         // Wait for PLL to be selected and stable PLL lock
-        while !mcg.s.matches(S::PLLST::SET + S::LOCK0::SET) {}
+        while !mcg.s.matches_all(Status::PLLST::SET + Status::LOCK0::SET) {}
 
         Pbe { }
     }
@@ -121,8 +121,8 @@ impl Pbe {
     pub fn use_pll(self) {
         let mcg: &mut Registers = unsafe { mem::transmute(MCG) };
 
-        mcg.c1.modify(C1::CLKS::LockedLoop);
+        mcg.c1.modify(Control1::CLKS::LockedLoop);
 
-        while !mcg.s.matches(S::CLKST::Pll) {}
+        while !mcg.s.matches_all(Status::CLKST::Pll) {}
     }
 }

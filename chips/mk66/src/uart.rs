@@ -1,7 +1,7 @@
 //! Implementation of the MK66 UART Peripheral
 
 use core::cell::Cell;
-use kernel::common::take_cell::TakeCell;
+use kernel::common::cells::TakeCell;
 use kernel::hil;
 use kernel::hil::uart;
 use core::mem;
@@ -39,7 +39,7 @@ impl Uart {
     pub fn handle_interrupt(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
         // Read byte from data register; reading S1 and D clears interrupt
-        if regs.s1.is_set(S1::RDRF) {
+        if regs.s1.is_set(Status1::RDRF) {
             let datum: u8 = regs.d.get();
 
             // Put byte into buffer, trigger callback if buffer full
@@ -72,28 +72,28 @@ impl Uart {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
 
         let (pe, pt) = match parity {
-            hil::uart::Parity::None => (C1::PE::CLEAR, C1::PT::Even),
-            hil::uart::Parity::Even => (C1::PE::SET, C1::PT::Even),
-            hil::uart::Parity::Odd => (C1::PE::SET, C1::PT::Odd)
+            hil::uart::Parity::None => (Control1::PE::CLEAR, Control1::PT::Even),
+            hil::uart::Parity::Even => (Control1::PE::SET, Control1::PT::Even),
+            hil::uart::Parity::Odd => (Control1::PE::SET, Control1::PT::Odd)
         };
 
         // This basic procedure outlined in section 59.9.3.
         // Set control register 1, which configures the parity.
         regs.c1.write(pe + pt +
-                      C1::LOOPS::CLEAR +
-                      C1::UARTSWAI::CLEAR +
-                      C1::RSRC::CLEAR +
-                      C1::M::EightBit +
-                      C1::WAKE::Idle +
-                      C1::ILT::AfterStop);
+                      Control1::LOOPS::CLEAR +
+                      Control1::UARTSWAI::CLEAR +
+                      Control1::RSRC::CLEAR +
+                      Control1::M::EightBit +
+                      Control1::WAKE::Idle +
+                      Control1::ILT::AfterStop);
     }
 
     fn set_stop_bits(&self, stop_bits: hil::uart::StopBits) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
 
         let stop_bits = match stop_bits {
-            hil::uart::StopBits::One => BDH::SBNS::One,
-            hil::uart::StopBits::Two => BDH::SBNS::Two
+            hil::uart::StopBits::One => BaudRateHigh::SBNS::One,
+            hil::uart::StopBits::Two => BaudRateHigh::SBNS::Two
         };
 
         regs.bdh.modify(stop_bits);
@@ -112,21 +112,21 @@ impl Uart {
         let baud_counter: u32 = (uart_clock >> 4) / baud_rate;
 
         // Set the baud rate.
-        regs.c4.modify(C4::BRFA.val(0));
-        regs.bdh.modify(BDH::SBR.val((baud_counter >> 8) as u8));
+        regs.c4.modify(Control4::BRFA.val(0));
+        regs.bdh.modify(BaudRateHigh::SBR.val((baud_counter >> 8) as u8));
         regs.bdl.set(baud_counter as u8);
     }
 
     pub fn enable_rx(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c1.modify(C1::ILT::SET); // Idle after stop bit
-        regs.c2.modify(C2::RE::SET);  // Enable UART reception
+        regs.c1.modify(Control1::ILT::SET); // Idle after stop bit
+        regs.c2.modify(Control2::RE::SET);  // Enable UART reception
     }
 
     pub fn enable_rx_interrupts(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
         regs.rwfifo.set(1);               // Issue interrupt on each byte
-        regs.c5.modify(C5::RDMAS::CLEAR); // Issue interrupt on RX data
+        regs.c5.modify(Control5::RDMAS::CLEAR); // Issue interrupt on RX data
 
         match self.index {
             0 => unsafe {nvic::enable(nvic::NvicIdx::UART0)},
@@ -136,12 +136,12 @@ impl Uart {
             4 => unsafe {nvic::enable(nvic::NvicIdx::UART4)},
             _ => unreachable!()
         };
-        regs.c2.modify(C2::RIE::SET);     // Enable interrupts
+        regs.c2.modify(Control2::RIE::SET);     // Enable interrupts
     }
 
     pub fn enable_tx(&self) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.c2.modify(C2::TE::SET);
+        regs.c2.modify(Control2::TE::SET);
     }
 
     fn enable_clock(&self) {
@@ -159,13 +159,13 @@ impl Uart {
     pub fn send_byte(&self, byte: u8) {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
 
-        while !regs.s1.is_set(S1::TRDE) {}
+        while !regs.s1.is_set(Status1::TRDE) {}
         regs.d.set(byte);
     }
 
     pub fn tx_ready(&self) -> bool {
         let regs: &mut Registers = unsafe { mem::transmute(self.registers) };
-        regs.s1.is_set(S1::TC)
+        regs.s1.is_set(Status1::TC)
     }
 }
 
@@ -212,15 +212,8 @@ impl hil::uart::UART for Uart {
         self.rx_len.set(length);
         self.rx_index.set(0);
     }
-}
 
-interrupt_handler!(uart0_handler, UART0);
-interrupt_handler!(uart1_handler, UART1);
-interrupt_handler!(uart2_handler, UART2);
-interrupt_handler!(uart3_handler, UART3);
-interrupt_handler!(uart4_handler, UART4);
-interrupt_handler!(uart0_err_handler, UART0);
-interrupt_handler!(uart1_err_handler, UART1);
-interrupt_handler!(uart2_err_handler, UART2);
-interrupt_handler!(uart3_err_handler, UART3);
-interrupt_handler!(uart4_err_handler, UART4);
+    fn abort_receive(&self) {
+        unimplemented!();
+    }
+}
