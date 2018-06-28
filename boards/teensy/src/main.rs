@@ -1,15 +1,11 @@
 #![no_std]
 #![no_main]
-#![feature(asm,const_fn,lang_items,compiler_builtins_lib)]
+#![feature(asm,const_fn,lang_items)]
 
 extern crate capsules;
-extern crate compiler_builtins;
 
-#[macro_use(debug, static_init)]
+#[macro_use(debug, static_init, register_bitfields, register_bitmasks)]
 extern crate kernel;
-
-#[macro_use]
-extern crate common;
 
 #[allow(dead_code)]
 extern crate mk66;
@@ -114,11 +110,11 @@ pub unsafe fn reset_handler() {
     if tests::TEST {
         tests::test();
     }
-    kernel::main(&teensy, &mut chip, load_processes(), &teensy.ipc);
+    kernel::kernel_loop(&teensy, &mut chip, load_processes(), Some(&teensy.ipc));
 }
 
 
-unsafe fn load_processes() -> &'static mut [Option<kernel::Process<'static>>] {
+unsafe fn load_processes() -> &'static mut [Option<&'static mut kernel::procs::Process<'static>>] {
     extern "C" {
         /// Beginning of the ROM region containing the app images.
         static _sapps: u8;
@@ -131,28 +127,16 @@ unsafe fn load_processes() -> &'static mut [Option<kernel::Process<'static>>] {
     static mut APP_MEMORY: [u8; 1 << 17] = [0; 1 << 17];
 
     // How the kernel responds when a process faults
-    const FAULT_RESPONSE: kernel::process::FaultResponse = kernel::process::FaultResponse::Panic;
+    const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultResponse::Panic;
 
-    static mut PROCESSES: [Option<kernel::Process<'static>>; NUM_PROCS] = [None];
+    static mut PROCESSES: [Option<&'static mut kernel::procs::Process<'static>>; NUM_PROCS] = [None];
 
-    // Create the processes and allocate the app memory among them
-    let mut apps_in_flash_ptr = &_sapps as *const u8;
-    let mut app_memory_ptr = APP_MEMORY.as_mut_ptr();
-    let mut app_memory_size = APP_MEMORY.len();
-    for i in 0..NUM_PROCS {
-        let (process, flash_offset, memory_offset) = kernel::Process::create(apps_in_flash_ptr,
-                                                                             app_memory_ptr,
-                                                                             app_memory_size,
-                                                                             FAULT_RESPONSE);
-        if process.is_none() {
-            break;
-        }
-
-        PROCESSES[i] = process;
-        apps_in_flash_ptr = apps_in_flash_ptr.offset(flash_offset as isize);
-        app_memory_ptr = app_memory_ptr.offset(memory_offset as isize);
-        app_memory_size -= memory_offset;
-    }
+    kernel::procs::load_processes(
+        &_sapps as *const u8,
+        &mut APP_MEMORY,
+        &mut PROCESSES,
+        FAULT_RESPONSE,
+    );
 
     &mut PROCESSES
 }

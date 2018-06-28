@@ -41,9 +41,8 @@
 use core::cell::Cell;
 use core::cmp;
 use kernel::{AppId, AppSlice, Grant, Callback, Shared, Driver, ReturnCode};
-use kernel::common::take_cell::TakeCell;
+use kernel::common::cells::TakeCell;
 use kernel::hil::uart::{self, UART, Client};
-use kernel::process::Error;
 
 pub const DRIVER_NUM: usize = 0x00000001;
 
@@ -181,32 +180,24 @@ impl<'a, U: UART> Driver for XConsole<'a, U> {
     ///
     /// - `0`: Writeable buffer for reads
     /// - `1`: Writeable buffer for write buffer
-    fn allow(&self, appid: AppId, allow_num: usize, slice: AppSlice<Shared, u8>) -> ReturnCode {
+    fn allow(&self, appid: AppId, allow_num: usize, slice: Option<AppSlice<Shared, u8>>) -> ReturnCode {
         match allow_num {
             0 => {
                 self.apps
                     .enter(appid, |app, _| {
-                        app.read_buffer = Some(slice);
+                        app.read_buffer = slice;
                         app.read_idx = 0;
                         ReturnCode::SUCCESS
                     })
-                    .unwrap_or_else(|err| match err {
-                        Error::OutOfMemory => ReturnCode::ENOMEM,
-                        Error::AddressOutOfBounds => ReturnCode::EINVAL,
-                        Error::NoSuchApp => ReturnCode::EINVAL,
-                    })
+                    .unwrap_or_else(|err| err.into())
             }
             1 => {
                 self.apps
                     .enter(appid, |app, _| {
-                        app.write_buffer = Some(slice);
+                        app.write_buffer = slice;
                         ReturnCode::SUCCESS
                     })
-                    .unwrap_or_else(|err| match err {
-                        Error::OutOfMemory => ReturnCode::ENOMEM,
-                        Error::AddressOutOfBounds => ReturnCode::EINVAL,
-                        Error::NoSuchApp => ReturnCode::EINVAL,
-                    })
+                    .unwrap_or_else(|err| err.into())
             }
             _ => ReturnCode::ENOSUPPORT,
         }
@@ -218,31 +209,19 @@ impl<'a, U: UART> Driver for XConsole<'a, U> {
     ///
     /// - `0`: Read callback
     /// - `1`: Write buffer completed callback
-    fn subscribe(&self, subscribe_num: usize, callback: Callback) -> ReturnCode {
+    fn subscribe(&self, subscribe_num: usize, callback: Option<Callback>, app_id: AppId) -> ReturnCode {
         match subscribe_num {
             0 /* read callback */ => {
-                self.apps.enter(callback.app_id(), |app, _| {
-                    app.read_callback = Some(callback);
+                self.apps.enter(app_id, |app, _| {
+                    app.read_callback = callback;
                     ReturnCode::SUCCESS
-                }).unwrap_or_else(|err| {
-                    match err {
-                        Error::OutOfMemory => ReturnCode::ENOMEM,
-                        Error::AddressOutOfBounds => ReturnCode::EINVAL,
-                        Error::NoSuchApp => ReturnCode::EINVAL,
-                    }
-                })
+                }).unwrap_or_else(|err| err.into())
             },
             1 /* putstr/write_done */ => {
-                self.apps.enter(callback.app_id(), |app, _| {
-                    app.write_callback = Some(callback);
+                self.apps.enter(app_id, |app, _| {
+                    app.write_callback = callback;
                     ReturnCode::SUCCESS
-                }).unwrap_or_else(|err| {
-                    match err {
-                        Error::OutOfMemory => ReturnCode::ENOMEM,
-                        Error::AddressOutOfBounds => ReturnCode::EINVAL,
-                        Error::NoSuchApp => ReturnCode::EINVAL,
-                    }
-                })
+                }).unwrap_or_else(|err| err.into())
             },
             _ => ReturnCode::ENOSUPPORT
         }
@@ -262,13 +241,7 @@ impl<'a, U: UART> Driver for XConsole<'a, U> {
                 let len = arg1;
                 self.apps.enter(appid, |app, _| {
                     self.send_new(appid, app, len)
-                }).unwrap_or_else(|err| {
-                    match err {
-                        Error::OutOfMemory => ReturnCode::ENOMEM,
-                        Error::AddressOutOfBounds => ReturnCode::EINVAL,
-                        Error::NoSuchApp => ReturnCode::EINVAL,
-                    }
-                })
+                }).unwrap_or_else(|err| err.into())
             },
             2 /* raw read */ => {
                 let len = arg1;
@@ -278,13 +251,7 @@ impl<'a, U: UART> Driver for XConsole<'a, U> {
                         self.in_progress_rx.set(Some(appid));
                         ReturnCode::SUCCESS
                     })
-                }).unwrap_or_else(|err| {
-                    match err {
-                        Error::OutOfMemory => ReturnCode::ENOMEM,
-                        Error::AddressOutOfBounds => ReturnCode::EINVAL,
-                        Error::NoSuchApp => ReturnCode::EINVAL,
-                    }
-                })
+                }).unwrap_or_else(|err| err.into())
             },
             _ => ReturnCode::ENOSUPPORT
         }

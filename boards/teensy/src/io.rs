@@ -1,6 +1,7 @@
 use core::fmt::*;
 use kernel::hil::uart::{self, UART};
-use kernel::process;
+use kernel::hil::led;
+use kernel::debug;
 use mk66::{self, gpio};
 
 pub struct Writer {
@@ -38,44 +39,12 @@ impl Write for Writer {
 #[lang="panic_fmt"]
 pub unsafe extern "C" fn panic_fmt(args: Arguments, file: &'static str, line: u32) -> ! {
     let writer = &mut WRITER;
-    let _ = writer.write_fmt(format_args!("\r\n\nKernel panic at {}:{}:\r\n\t\"", file, line));
-    let _ = write(writer, args);
-    let _ = writer.write_str("\"\r\n");
-
-    // Print version of the kernel
-    let _ = writer.write_fmt(format_args!("\tKernel version {}\r\n", env!("TOCK_KERNEL_VERSION")));
-
-    // Print fault status once
-    let procs = &mut process::PROCS;
-    if procs.len() > 0 {
-        procs[0].as_mut().map(|process| { process.fault_str(writer); });
-    }
-
-    // print data about each process
-    let _ = writer.write_fmt(format_args!("\r\n---| App Status |---\r\n"));
-    let procs = &mut process::PROCS;
-    for idx in 0..procs.len() {
-        procs[idx].as_mut().map(|process| { process.statistics_str(writer); });
-    }
 
     // blink the panic signal
     gpio::PC05.release_claim();
-    let led = gpio::PC05.claim_as_gpio(); 
-    led.enable_output();
-    loop {
-        for _ in 0..1000000 {
-            led.clear();
-        }
-        for _ in 0..100000 {
-            led.set();
-        }
-        for _ in 0..1000000 {
-            led.clear();
-        }
-        for _ in 0..500000 {
-            led.set();
-        }
-    }
+    let led = &mut led::LedLow::new(gpio::PC05.claim_as_gpio());
+
+    debug::panic(led, writer, args, file, line)
 }
 
 #[macro_export]

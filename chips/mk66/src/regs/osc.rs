@@ -1,18 +1,18 @@
-use common::regs::ReadWrite;
+use kernel::common::regs::ReadWrite;
 
 pub const OSC: *mut Registers = 0x4006_5000 as *mut Registers;
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct Registers {
-    pub cr: ReadWrite<u8, Control>,
-    pub div: ReadWrite<u8, Divider>
+    pub cr: ReadWrite<u8, Control::Register>,
+    pub div: ReadWrite<u8, Divider::Register>
 }
 
-bitfields![u8,
-    CR Control [
-        ERCLKEN 7 [],
-        EREFSTEN 5 [],
-        CAP (0, Mask(0b1111)) [
+register_bitfields![u8,
+    Control [
+        ERCLKEN OFFSET(7) NUMBITS(1) [],
+        EREFSTEN OFFSET(5) NUMBITS(1) [],
+        CAP OFFSET(0) NUMBITS(4) [
             Load_0pF = 0b0000,
             Load_2pF = 0b1000,
             Load_4pF = 0b0100,
@@ -31,8 +31,8 @@ bitfields![u8,
             Load_30pF = 0b1111
         ]
     ],
-    DIV Divider [
-        ERPS (6, Mask(0b11)) [
+    Divider [
+        ERPS OFFSET(6) NUMBITS(2) [
             Div1 = 0,
             Div2 = 1,
             Div4 = 2,

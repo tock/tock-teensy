@@ -1,6 +1,5 @@
+use cortexm4;
 use kernel::Chip;
-use kernel::common::{RingBuffer, Queue};
-use nvic;
 use pit;
 use spi;
 use gpio;
@@ -11,16 +10,8 @@ pub struct MK66 {
     pub systick: (),
 }
 
-// Interrupt queue allocation
-const IQ_SIZE: usize = 100;
-static mut IQ_BUF: [nvic::NvicIdx; IQ_SIZE] = [nvic::NvicIdx::DMA0; IQ_SIZE];
-pub static mut INTERRUPT_QUEUE: Option<RingBuffer<'static, nvic::NvicIdx>> = None;
-
 impl MK66 {
     pub unsafe fn new() -> MK66 {
-        // Initialize interrupt queue
-        INTERRUPT_QUEUE = Some(RingBuffer::new(&mut IQ_BUF));
-
         // Set up DMA channels
         // TODO: implement
 
@@ -36,10 +27,9 @@ impl Chip for MK66 {
     type SysTick = ();
 
     fn service_pending_interrupts(&mut self) {
-        use nvic::NvicIdx::*;
+        use nvic::*;
         unsafe {
-            let iq = INTERRUPT_QUEUE.as_mut().unwrap();
-            while let Some(interrupt) = iq.dequeue() {
+            while let Some(interrupt) = cortexm4::nvic::next_pending() {
                 match interrupt {
                     PCMA => gpio::PA.handle_interrupt(),
                     PCMB => gpio::PB.handle_interrupt(),
@@ -55,13 +45,15 @@ impl Chip for MK66 {
                     _ => {}
                 }
 
-                nvic::enable(interrupt);
+                let n = cortexm4::nvic::Nvic::new(interrupt);
+                n.clear_pending();
+                n.enable();
             }
         }
     }
 
     fn has_pending_interrupts(&self) -> bool {
-        unsafe { INTERRUPT_QUEUE.as_mut().unwrap().has_elements() }
+        unsafe { cortexm4::nvic::has_pending() }
     }
 
     fn mpu(&self) -> &Self::MPU {
@@ -70,5 +62,15 @@ impl Chip for MK66 {
 
     fn systick(&self) -> &Self::SysTick {
         &self.systick
+    }
+
+    fn sleep(&self) {
+    }
+
+    unsafe fn atomic<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        cortexm4::support::atomic(f)
     }
 }

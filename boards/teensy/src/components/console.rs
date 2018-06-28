@@ -21,6 +21,7 @@ impl Component for UartConsoleComponent {
                 capsules::console::Console::new(&mk66::uart::UART0,
                                                 115200,
                                                 &mut capsules::console::WRITE_BUF,
+                                                &mut capsules::console::READ_BUF,
                                                 kernel::Grant::create())
             );
         mk66::uart::UART0.set_client(console);
