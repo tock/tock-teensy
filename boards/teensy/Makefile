@@ -28,7 +28,7 @@ app: target/$(TARGET)/release/$(PLATFORM)-$(APP_NAME).hex
 
 
 target/$(TARGET)/release/$(PLATFORM)-$(APP_NAME): target/$(TARGET)/release/$(PLATFORM) ../../apps/$(APP)/build/$(TOCK_ARCH)/app 
-	$(Q)$(OBJCOPY) --update-section .apps=../../apps/$(APP)/build/cortex-m4/cortex-m4.bin \
+	$(Q)$(OBJCOPY) --update-section .apps=../../apps/$(APP)/build/cortex-m4/cortex-m4.tbf \
 		--set-section-flags .apps=alloc,code \
 		target/$(TARGET)/release/$(PLATFORM) $@
 
