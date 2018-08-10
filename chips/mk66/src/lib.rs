@@ -28,6 +28,7 @@ pub mod uart;
 pub mod clock;
 pub mod pit;
 pub mod spi;
+pub mod mpu;
 
 #[allow(while_true)]
 pub mod rnga;
