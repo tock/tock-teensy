@@ -4,9 +4,10 @@ use pit;
 use spi;
 use gpio;
 use uart;
+use mpu;
 
 pub struct MK66 {
-    pub mpu: (),
+    pub mpu: mpu::Mpu,
     pub systick: (),
 }
 
@@ -16,14 +17,14 @@ impl MK66 {
         // TODO: implement
 
         MK66 {
-            mpu: (),
+            mpu: mpu::Mpu::new(),
             systick: ()
         }
     }
 }
 
 impl Chip for MK66 {
-    type MPU = ();
+    type MPU = mpu::Mpu;
     type SysTick = ();
 
     fn service_pending_interrupts(&mut self) {
