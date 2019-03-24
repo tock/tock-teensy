@@ -7,11 +7,14 @@
 //! - Author: Conor McAvity <cmcavity@stanford.edu>
 
 use core::cell::Cell;
-use kernel::common::regs::{ReadWrite, WriteOnly, ReadOnly};
-use kernel::hil::rng::{self, Continue};
+use kernel::common::cells::OptionalCell;
+use kernel::common::registers::{register_bitfields, ReadWrite, WriteOnly, ReadOnly};
+use kernel::hil::entropy;
+use kernel::ReturnCode;
 use sha2::{Sha256, Digest};
 use twofish::{Twofish, BlockCipher};
 use block_cipher_trait::generic_array::GenericArray;
+use sim;
 
 #[repr(C)]
 struct RngaRegisters {
@@ -45,34 +48,29 @@ register_bitfields! [
 
 const BASE_ADDRESS: *const RngaRegisters = 0x40029000 as *const RngaRegisters;
 
-pub struct Rnga<'a> {
+pub struct Entropy<'a> {
     regs: *const RngaRegisters,
-    client: Cell<Option<&'a rng::Client>>,
+    client: OptionalCell<&'a entropy::Client32>,
     key: Cell<[u8; 32]>,
     counter: Cell<u128>,
 }
 
-pub static mut RNGA: Rnga<'static> = Rnga::new();
+pub static mut ENTROPY: Entropy<'static> = Entropy::new();
 
-impl<'a> Rnga<'a> {
-    const fn new() -> Rnga<'a> {
-        Rnga {
+impl<'a> Entropy<'a> {
+    const fn new() -> Entropy<'a> {
+        Entropy {
             regs: BASE_ADDRESS,
-            client: Cell::new(None),
+            client: OptionalCell::empty(),
             key: Cell::new([0; 32]),
             counter: Cell::new(0),
         }
     }
 
-    pub fn set_client(&self, client: &'a rng::Client) {
-        self.client.set(Some(client));
-    }
-
     pub fn init(&mut self) {
         // set clock gate
-        use regs::sim::*;
-        let sim = unsafe { &*SIM };
-        sim.scgc6.modify(SystemClockGatingControl6::RNGA::SET);
+        let sim = unsafe { &*sim::SIM };
+        sim.scgc6.modify(sim::SystemClockGatingControl6::RNGA::SET);
 
         // start rnga
         let regs = unsafe { &*self.regs };
@@ -141,9 +139,9 @@ impl<'a> Rnga<'a> {
     }
 }
 
-struct RngaIter<'a, 'b: 'a>(&'a Rnga<'b>);
+struct EntropyIter<'a, 'b: 'a>(&'a Entropy<'b>);
 
-impl<'a, 'b> Iterator for RngaIter<'a, 'b> {
+impl<'a, 'b> Iterator for EntropyIter<'a, 'b> {
     type Item = u32;
 
     fn next(&mut self) -> Option<u32> {
@@ -151,14 +149,27 @@ impl<'a, 'b> Iterator for RngaIter<'a, 'b> {
     }
 }
 
-impl<'a> rng::RNG for Rnga<'a> {
-    fn get(&self) {
-        while true {
-            let result = self.client.get().unwrap()
-                .randomness_available(&mut RngaIter(self));
-            if let Continue::Done = result {
-                break;
+impl<'a> entropy::Entropy32<'a> for Entropy<'a> {
+    fn get(&self) -> ReturnCode {
+        if self.client.is_none() {
+            return ReturnCode::FAIL
+        } 
+        self.client.map(|client| {
+            while true {
+                let result = client.entropy_available(&mut EntropyIter(self), ReturnCode::SUCCESS);
+                if let entropy::Continue::Done = result {
+                    break;
+                }
             }
-        }
+        });
+        ReturnCode::SUCCESS
+    }
+
+    fn set_client(&self, client: &'a entropy::Client32) {
+        self.client.replace(client);
+    }
+
+    fn cancel(&self) -> ReturnCode {
+        ReturnCode::SUCCESS
     }
 }

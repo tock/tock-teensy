@@ -7,7 +7,7 @@ use core::cell::Cell;
 use core::sync::atomic::Ordering;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT};
-use kernel::common::regs::{ReadWrite, WriteOnly, ReadOnly};
+use kernel::common::registers::{register_bitfields, ReadWrite, WriteOnly, ReadOnly};
 use core::mem;
 use kernel::hil;
 use nvic::{self, NvicIdx};

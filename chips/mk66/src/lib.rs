@@ -7,11 +7,8 @@
 extern crate cortexm4;
 
 #[allow(unused_imports)]
-#[macro_use(debug, register_bitfields, register_bitmasks)]
+#[macro_use(debug)]
 extern crate kernel;
-
-#[allow(dead_code)]
-mod regs;
 
 extern crate sha2;
 extern crate twofish;

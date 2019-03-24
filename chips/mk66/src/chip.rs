@@ -7,8 +7,9 @@ use uart;
 use mpu;
 
 pub struct MK66 {
-    pub mpu: mpu::Mpu,
-    pub systick: (),
+    pub mpu: mpu::K66Mpu,
+    userspace_kernel_boundary: cortexm4::syscall::SysCall,
+    systick: cortexm4::systick::SysTick,
 }
 
 impl MK66 {
@@ -17,17 +18,19 @@ impl MK66 {
         // TODO: implement
 
         MK66 {
-            mpu: mpu::Mpu::new(),
-            systick: ()
+            mpu: mpu::K66Mpu::new(),
+            userspace_kernel_boundary: cortexm4::syscall::SysCall::new(),
+            systick: cortexm4::systick::SysTick::new(),
         }
     }
 }
 
 impl Chip for MK66 {
-    type MPU = mpu::Mpu;
-    type SysTick = ();
+    type MPU = mpu::K66Mpu;
+    type SysTick = cortexm4::systick::SysTick;
+    type UserspaceKernelBoundary = cortexm4::syscall::SysCall;
 
-    fn service_pending_interrupts(&mut self) {
+    fn service_pending_interrupts(&self) {
         use nvic::*;
         unsafe {
             while let Some(interrupt) = cortexm4::nvic::next_pending() {
@@ -66,6 +69,10 @@ impl Chip for MK66 {
     }
 
     fn sleep(&self) {
+    }
+
+    fn userspace_kernel_boundary(&self) -> &cortexm4::syscall::SysCall {
+        &self.userspace_kernel_boundary
     }
 
     unsafe fn atomic<F, R>(&self, f: F) -> R
