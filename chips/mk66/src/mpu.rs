@@ -9,6 +9,7 @@
 //! which is unintended behaviour.
 //!
 //! - Author: Conor McAvity <cmcavity@stanford.edu>
+//! - Updated to 1.3 MPU interface by Philip Levis <pal@cs.stanford.edu>
 
 use kernel::common::registers::{register_bitfields, FieldValue, ReadOnly, ReadWrite};
 use kernel::common::StaticRef;
@@ -19,51 +20,71 @@ const APP_MEMORY_REGION_NUM: usize = 0;
 #[derive(Copy, Clone)]
 pub struct K66Config {
     // There are 12 regions, but the first is reserved for the debugger
-    regions: [K66Region; 11],
+    regions: [K66ConfigRegion; 11],
 }
 
 #[repr(C)]
-struct MpuErrorRegisters {
+struct K66ErrorRegisters {
     ear: ReadOnly<u32, ErrorAddress::Register>,
     edr: ReadOnly<u32, ErrorDetail::Register>,
 }
 
-#[derive(Copy, Clone)]
+
 #[repr(C)]
-struct K66Region {
+#[derive(Clone, Copy)]
+struct K66ConfigRegion {
     location: Option<(u32, u32)>,
+    permissions: mpu::Permissions,
+    super_as_user: bool,
     rgd_word0: FieldValue<u32, RegionDescriptorWord0::Register>,
     rgd_word1: FieldValue<u32, RegionDescriptorWord1::Register>,
     rgd_word2: FieldValue<u32, RegionDescriptorWord2::Register>,
     rgd_word3: FieldValue<u32, RegionDescriptorWord3::Register>,
 }
 
-impl K66Region {
+/// Represention of the K66 MPU registers for one region
+#[repr(C)]
+struct K66RegionRegisters {
+    rgd_word0: ReadWrite<u32, RegionDescriptorWord0::Register>,
+    rgd_word1: ReadWrite<u32, RegionDescriptorWord1::Register>,
+    rgd_word2: ReadWrite<u32, RegionDescriptorWord2::Register>,
+    rgd_word3: ReadWrite<u32, RegionDescriptorWord3::Register>,
+}
+
+
+
+impl K66ConfigRegion {
     fn new(start: u32, end: u32, 
-           user_read: bool,  user_write: bool,  user_exec: bool,
-           super_as_user: bool) -> K66Region {
+           permissions: mpu::Permissions, 
+           super_as_user: bool) -> K66ConfigRegion {
 
-        let user_val = 0;
-        if user_read  { user_val = user_val | 0b001;}
-        if user_write { user_val = user_val | 0b010;}
-        if user_exec  { user_val = user_val | 0b100;}
-
-        let super_val = if super_as_user { 3 } else { 0 };
+        let user_val: u8 = match permissions {
+            mpu::Permissions::ReadWriteExecute => 0b111,
+            mpu::Permissions::ReadWriteOnly    => 0b110,
+            mpu::Permissions::ReadExecuteOnly  => 0b101,
+            mpu::Permissions::ReadOnly         => 0b100,
+            mpu::Permissions::ExecuteOnly      => 0b001,
+        };
+        let super_val = if super_as_user { 0b11 } else { 0 };
         
-        K66Region {
+        K66ConfigRegion {
             location: Some((start, end)),
+            permissions: permissions,
+            super_as_user: super_as_user,
             rgd_word0: RegionDescriptorWord0::SRTADDR.val(start >> 5),
             rgd_word1: RegionDescriptorWord1::ENDADDR.val(end >> 5),
             rgd_word2: RegionDescriptorWord2::M0SM.val(super_val) + 
-                       RegionDescriptorWord2::M0UM.val(user_val),
+                       RegionDescriptorWord2::M0UM.val(user_val as u32),
             rgd_word3: RegionDescriptorWord3::VLD::SET, 
         } 
     }
 
    
-    fn empty() -> K66Region {
-        K66Region {
+    fn empty() -> K66ConfigRegion {
+        K66ConfigRegion {
             location: None,
+            permissions: mpu::Permissions::ReadOnly,
+            super_as_user: false,
             rgd_word0: RegionDescriptorWord0::SRTADDR::CLEAR, 
             rgd_word1: RegionDescriptorWord1::ENDADDR::CLEAR, 
             rgd_word2: RegionDescriptorWord2::M0UM::CLEAR, 
@@ -72,37 +93,31 @@ impl K66Region {
     }
 
     fn overlaps(&self, start: *const u8, size: u32) -> bool {
-        let (region_start, region_end) = match self.location {
-            Some((region_start, region_end)) => {
-                let region_start = region_start as u32;
-                let region_end = region_end;
-                (region_start, region_end)
-            }
-            None => return false,
-        };
+        let region_start = self.base_address();
+        let region_end = self.end_address();
         let start = start as u32;
         let end = start + size;
         start < region_end && end > region_start
     }
    
-    fn location(&self) -> Option<(*const u8, u32)> {
+    fn location(&self) -> Option<(u32, u32)> {
         self.location
     }
 
-    fn base_address(&self) -> FieldValue<u32, RegionDescriptorWord0::Register> {
-        self.rgd_word0.get()
+    fn base_address(&self) -> u32 {
+        self.location.map_or(0, |(start, _)| start)
     }
 
-    fn end_address(&self) -> FieldValue<u32, RegionDescriptorWord1::Register> {
-        self.rgd_word1.get()
+    fn end_address(&self) -> u32 {
+        self.location.map_or(0, |(_, end)| end)
     }
   
-    fn supervisor_access(&self) -> u32 {
-        self.rgd_word2.read(RegionDescriptorWord2::M0SM)
+    fn supervisor_as_user(&self) -> bool {
+        self.super_as_user
     }
     
-    fn user_access(&self) -> u32 {
-        self.rgd_word2.read(RegionDescriptorWord2::M0UM)
+    fn user_permissions(&self) -> mpu::Permissions {
+        self.permissions
     } 
 
 }
@@ -110,7 +125,6 @@ impl K66Region {
 struct MpuAlternateAccessControl( 
     ReadWrite<u32, RegionDescriptorWord2::Register>
 );
-
 
 /// MPU registers for the K66
 ///
@@ -120,9 +134,9 @@ struct MpuAlternateAccessControl(
 struct MpuRegisters {
     cesr: ReadWrite<u32, ControlErrorStatus::Register>,
     _reserved0: [u32; 3],
-    ers: [MpuErrorRegisters; 5],
+    ers: [K66ErrorRegisters; 5],
     _reserved1: [u32; 242],
-    rgds: [K66Region; 12],
+    rgds: [K66RegionRegisters; 12],
     _reserved2: [u32; 208],
     rgdaacs: [MpuAlternateAccessControl; 12],
 }
@@ -284,7 +298,7 @@ impl K66Config {
             }
             if let None = region.location() {
                 return Some(number);
-            }
+             }
         }
         None
     }
@@ -294,17 +308,17 @@ impl Default for K66Config {
     fn default() -> K66Config {
         K66Config {
             regions: [
-                K66Region::empty(),
-                K66Region::empty(),
-                K66Region::empty(),
-                K66Region::empty(),
-                K66Region::empty(),
-                K66Region::empty(),
-                K66Region::empty(),
-                K66Region::empty(),
-                K66Region::empty(),
-		K66Region::empty(),
-                K66Region::empty(),
+                K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
+		K66ConfigRegion::empty(),
+                K66ConfigRegion::empty(),
             ],
         }
     }
@@ -346,7 +360,7 @@ impl mpu::MPU for K66Mpu {
 
         let region_num = config.unused_region_number()?;
 
-        let mut start = unallocated_memory_start as usize;
+        let mut start = unallocated_memory_start as u32;
 
         // We only have 12 region descriptors, and regions must be 32-byte aligned
         if region_num > 11 || 
@@ -354,22 +368,18 @@ impl mpu::MPU for K66Mpu {
            unallocated_memory_size % 32 != 0 {
             return None;
         }
- 
-        // The end address register is always 31 modulo 32
-        let end = (start + unallocated_memory_size - 1) & !0x1f;
 
-        let (read, write, execute) = match access {
-                mpu::Permissions::ReadWriteExecute => (true,  true,  true),
-                mpu::Permissions::ReadWriteOnly    => (true,  true,  false),
-                mpu::Permissions::ReadExecuteOnly  => (true,  false, true), 
-                mpu::Permissions::ReadOnly         => (true,  false, false),
-                mpu::Permissions::ExecuteOnly      => (false, false, true),
-        };
+        let unallocated_memory_size: u32 = unallocated_memory_size as u32;
+        // The end address register is always 31 modulo 32
+        let end = ((start + unallocated_memory_size - 1) & !0x1f) as u32;
 
         // Allocate a new region with these permissions and supervisor has full
         // permissions.
-        let region = unsafe { mpu::Region::new(start, end, read, write, execute, false) };
-
+        let region = unsafe { K66ConfigRegion::new(start, end, access, false) };
+        config.regions[region_num] = region;
+        let start_addr = unsafe {start as *const u8};
+        let size: usize = (end - start) as usize;
+        let region = mpu::Region::new(start_addr, size);
         Some(region)
     }
 
@@ -403,19 +413,33 @@ impl mpu::MPU for K66Mpu {
     fn configure_mpu(&self, config: &Self::MpuConfig) {
         let regs = &*self.0;
         for (i, region) in config.regions.iter().enumerate() {
-            let base_address = u32.from(region.base_address());
-            let end_address = u32.from(region.end_address());
-            let supervisor = region.supervisor_access(); 
-            let user = region.user_access();
- 
+            let base_address = u32::from(region.base_address());
+            let end_address = u32::from(region.end_address());
+
+            let permissions = region.user_permissions();
+            let user: u32 = match permissions {
+                mpu::Permissions::ReadWriteExecute => 0b111,
+                mpu::Permissions::ReadWriteOnly    => 0b110,
+                mpu::Permissions::ReadExecuteOnly  => 0b101,
+                mpu::Permissions::ReadOnly         => 0b100,
+                mpu::Permissions::ExecuteOnly      => 0b001,
+            };
+            
+            let super_as_user = region.supervisor_as_user();
+            let supervisor = if super_as_user {0b11} else {0b00};
+            
             let start = base_address >> 5; 
             let end = end_address >> 5;
 
+            // Add 1 because region 0 is reserved. The 11 regions
+            // with i=0..10 refer to regions 1.11.
+            let region_num = i + 1; 
             // Write to region descriptor
-            regs.rgds[region_num].rgd_word0.write(RegionDescriptorWord0::SRTADDR.val(start));
-            regs.rgds[region_num].rgd_word1.write(RegionDescriptorWord1::ENDADDR.val(end));
-            regs.rgds[region_num].rgd_word2.write(supervisor + user);
-            regs.rgds[region_num].rgd_word3.write(RegionDescriptorWord3::VLD::SET);
+            regs.rgds[i].rgd_word0.set(RegionDescriptorWord0::SRTADDR.val(start));
+            regs.rgds[i].rgd_word1.set(RegionDescriptorWord1::ENDADDR.val(end));
+            regs.rgds[i].rgd_word2.write(RegionDescriptorWord2::M3UM.val(user));
+            regs.rgds[i].rgd_word2.write(RegionDescriptorWord2::M3SM.val(supervisor));
+            regs.rgds[i].rgd_word3.write(RegionDescriptorWord3::VLD::SET);
         }
     }
 }
