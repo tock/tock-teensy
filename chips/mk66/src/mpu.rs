@@ -33,7 +33,7 @@ struct K66ErrorRegisters {
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct K66ConfigRegion {
-    location: Option<(u32, u32)>,
+    location: Option<(usize, usize)>,
     permissions: mpu::Permissions,
     super_as_user: bool,
     rgd_word0: FieldValue<u32, RegionDescriptorWord0::Register>,
@@ -54,7 +54,7 @@ struct K66RegionRegisters {
 
 
 impl K66ConfigRegion {
-    fn new(start: u32, end: u32, 
+    fn new(start: usize, end: usize, 
            permissions: mpu::Permissions, 
            super_as_user: bool) -> K66ConfigRegion {
 
@@ -71,8 +71,8 @@ impl K66ConfigRegion {
             location: Some((start, end)),
             permissions: permissions,
             super_as_user: super_as_user,
-            rgd_word0: RegionDescriptorWord0::SRTADDR.val(start >> 5),
-            rgd_word1: RegionDescriptorWord1::ENDADDR.val(end >> 5),
+            rgd_word0: RegionDescriptorWord0::SRTADDR.val(start as u32 >> 5),
+            rgd_word1: RegionDescriptorWord1::ENDADDR.val(end as u32 >> 5),
             rgd_word2: RegionDescriptorWord2::M0SM.val(super_val) + 
                        RegionDescriptorWord2::M0UM.val(user_val as u32),
             rgd_word3: RegionDescriptorWord3::VLD::SET, 
@@ -92,23 +92,23 @@ impl K66ConfigRegion {
         }
     }
 
-    fn overlaps(&self, start: *const u8, size: u32) -> bool {
+    fn overlaps(&self, start: *const u8, size: usize) -> bool {
         let region_start = self.base_address();
         let region_end = self.end_address();
-        let start = start as u32;
+        let start = start as usize;
         let end = start + size;
         start < region_end && end > region_start
     }
    
-    fn location(&self) -> Option<(u32, u32)> {
+    fn location(&self) -> Option<(usize, usize)> {
         self.location
     }
 
-    fn base_address(&self) -> u32 {
+    fn base_address(&self) -> usize {
         self.location.map_or(0, |(start, _)| start)
     }
 
-    fn end_address(&self) -> u32 {
+    fn end_address(&self) -> usize {
         self.location.map_or(0, |(_, end)| end)
     }
   
@@ -292,19 +292,19 @@ impl K66Mpu {
     // Returns true if one of the regions in MpuConfig overlaps with
     // the block [start, start + size)
     fn overlaps(&self, 
-                config: &Self::MpuConfig, 
-                start: *const u8, size: u32) -> bool {
+                config: &K66Config, 
+                start: *const u8, size: usize) -> bool {
         for region in config.regions.iter() {
-            if region.overlaps(unallocated_memory_start, unallocated_memory_size as u32) {
-                let (start, end) = region.location.map_or((0, 0), |r| r);
-                debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty: region {}-{}.\n", unallocated_memory_start as usize, unallocated_memory_size, start, end);
+            if region.overlaps(start, size) {
+                let (region_start, region_end) = region.location.map_or((0, 0), |r| r);
+                debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty: region {}-{}.\n", start as usize, size, region_start, region_end);
                 return true;
             }
         }
         false
     }
-
-    fn region_valid(&self, region_num: usize, start: u32, size: u32) {
+    
+    fn region_valid(&self, region_num: usize, start: usize, size: usize) -> bool {
         // Check that region number is valid and both the start/size
         // are evenly divisible by 32, since that is the MPU allocation
         // granularity
@@ -375,21 +375,20 @@ impl mpu::MPU for K66Mpu {
         config: &mut Self::MpuConfig,
     ) -> Option<mpu::Region> {
         if self.overlaps(config, unallocated_memory_start, unallocated_memory_size) {
-            debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty: region {}-{}.\n", unallocated_memory_start as usize, unallocated_memory_size, start, end);
+            debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty\n", unallocated_memory_start as usize, unallocated_memory_size);
             return None;
         }
         let region_num = config.unused_region_number()?;
 
-        let mut start = unallocated_memory_start as u32;
+        let mut start = unallocated_memory_start as usize;
 
         if !self.region_valid(region_num, start, unallocated_memory_size) {
             debug!("MPU error: invalid memory region: region_num={}, start={}, unallocated_memory_size={}\n", region_num, start, unallocated_memory_size);
             return None;
         }
 
-        let unallocated_memory_size: u32 = unallocated_memory_size as u32;
         // The end address register is always 31 modulo 32
-        let end = ((start + unallocated_memory_size - 1) & !0x1f) as u32;
+        let end = (start + unallocated_memory_size - 1) & !0x1f;
 
         // Allocate a new region with these permissions and supervisor has full
         // permissions.
@@ -416,7 +415,7 @@ impl mpu::MPU for K66Mpu {
         config: &mut Self::MpuConfig,
     ) -> Option<(*const u8, usize)> {
         if self.overlaps(config, unallocated_memory_start, unallocated_memory_size) {
-            debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty: region {}-{}.\n", unallocated_memory_start as usize, unallocated_memory_size, start, end);
+            debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty.\n", unallocated_memory_start as usize, unallocated_memory_size);
             return None;
         }
         let region_num = config.unused_region_number()?;
@@ -436,8 +435,8 @@ impl mpu::MPU for K66Mpu {
     fn configure_mpu(&self, config: &Self::MpuConfig) {
         let regs = &*self.0;
         for (i, region) in config.regions.iter().enumerate() {
-            let base_address = u32::from(region.base_address());
-            let end_address = u32::from(region.end_address());
+            let base_address = region.base_address();
+            let end_address = region.end_address();
 
             let permissions = region.user_permissions();
             let user: u32 = match permissions {
@@ -458,8 +457,8 @@ impl mpu::MPU for K66Mpu {
             // with i=0..10 refer to regions 1.11.
             let region_num = i + 1; 
             // Write to region descriptor
-            regs.rgds[i].rgd_word0.write(RegionDescriptorWord0::SRTADDR.val(start));
-            regs.rgds[i].rgd_word1.write(RegionDescriptorWord1::ENDADDR.val(end));
+            regs.rgds[i].rgd_word0.write(RegionDescriptorWord0::SRTADDR.val(start as u32));
+            regs.rgds[i].rgd_word1.write(RegionDescriptorWord1::ENDADDR.val(end as u32));
             regs.rgds[i].rgd_word2.write(RegionDescriptorWord2::M3UM.val(user));
             regs.rgds[i].rgd_word2.write(RegionDescriptorWord2::M3SM.val(supervisor));
             regs.rgds[i].rgd_word3.write(RegionDescriptorWord3::VLD::SET);
