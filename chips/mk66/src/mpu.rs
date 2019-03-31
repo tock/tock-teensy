@@ -288,6 +288,28 @@ impl K66Mpu {
     pub const unsafe fn new () -> K66Mpu {
         K66Mpu(BASE_ADDRESS)
     }
+
+    // Returns true if one of the regions in MpuConfig overlaps with
+    // the block [start, start + size)
+    fn overlaps(&self, 
+                config: &Self::MpuConfig, 
+                start: *const u8, size: u32) -> bool {
+        for region in config.regions.iter() {
+            if region.overlaps(unallocated_memory_start, unallocated_memory_size as u32) {
+                let (start, end) = region.location.map_or((0, 0), |r| r);
+                debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty: region {}-{}.\n", unallocated_memory_start as usize, unallocated_memory_size, start, end);
+                return true;
+            }
+        }
+        false
+    }
+
+    fn region_valid(&self, region_num: usize, start: u32, size: u32) {
+        // Check that region number is valid and both the start/size
+        // are evenly divisible by 32, since that is the MPU allocation
+        // granularity
+        region_num <= 11 && start % 32 == 0 && size % 32 == 0 
+    }
 }
 
 impl K66Config {
@@ -352,20 +374,16 @@ impl mpu::MPU for K66Mpu {
         access: mpu::Permissions,
         config: &mut Self::MpuConfig,
     ) -> Option<mpu::Region> {
-        for region in config.regions.iter() {
-            if region.overlaps(unallocated_memory_start, unallocated_memory_size as u32) {
-                return None;
-            }
+        if self.overlaps(config, unallocated_memory_start, unallocated_memory_size) {
+            debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty: region {}-{}.\n", unallocated_memory_start as usize, unallocated_memory_size, start, end);
+            return None;
         }
-
         let region_num = config.unused_region_number()?;
 
         let mut start = unallocated_memory_start as u32;
 
-        // We only have 12 region descriptors, and regions must be 32-byte aligned
-        if region_num > 11 || 
-           start % 32 != 0 || 
-           unallocated_memory_size % 32 != 0 {
+        if !self.region_valid(region_num, start, unallocated_memory_size) {
+            debug!("MPU error: invalid memory region: region_num={}, start={}, unallocated_memory_size={}\n", region_num, start, unallocated_memory_size);
             return None;
         }
 
@@ -397,7 +415,12 @@ impl mpu::MPU for K66Mpu {
         permissions: mpu::Permissions,
         config: &mut Self::MpuConfig,
     ) -> Option<(*const u8, usize)> {
-
+        if self.overlaps(config, unallocated_memory_start, unallocated_memory_size) {
+            debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty: region {}-{}.\n", unallocated_memory_start as usize, unallocated_memory_size, start, end);
+            return None;
+        }
+        let region_num = config.unused_region_number()?;
+ 
     }
 
     fn update_app_memory_region(
@@ -435,8 +458,8 @@ impl mpu::MPU for K66Mpu {
             // with i=0..10 refer to regions 1.11.
             let region_num = i + 1; 
             // Write to region descriptor
-            regs.rgds[i].rgd_word0.set(RegionDescriptorWord0::SRTADDR.val(start));
-            regs.rgds[i].rgd_word1.set(RegionDescriptorWord1::ENDADDR.val(end));
+            regs.rgds[i].rgd_word0.write(RegionDescriptorWord0::SRTADDR.val(start));
+            regs.rgds[i].rgd_word1.write(RegionDescriptorWord1::ENDADDR.val(end));
             regs.rgds[i].rgd_word2.write(RegionDescriptorWord2::M3UM.val(user));
             regs.rgds[i].rgd_word2.write(RegionDescriptorWord2::M3SM.val(supervisor));
             regs.rgds[i].rgd_word3.write(RegionDescriptorWord3::VLD::SET);
