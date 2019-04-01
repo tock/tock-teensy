@@ -1,6 +1,7 @@
-use mk66;
 use capsules;
 use components::{Component, ComponentWithDependency};
+use kernel::static_init;
+use mk66;
 
 type PinHandle = &'static mk66::gpio::Gpio<'static>;
 

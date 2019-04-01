@@ -3,9 +3,6 @@
 mod blink;
 
 #[allow(dead_code)]
-mod registers;
-
-#[allow(dead_code)]
 mod print;
 
 #[allow(dead_code)]

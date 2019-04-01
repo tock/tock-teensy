@@ -42,7 +42,7 @@ use core::cell::Cell;
 use core::cmp;
 use kernel::{AppId, AppSlice, Grant, Callback, Shared, Driver, ReturnCode};
 use kernel::common::cells::TakeCell;
-use kernel::hil::uart::{self, UART, Client};
+use kernel::hil::uart::{self, Transmit, TransmitClient};
 
 pub const DRIVER_NUM: usize = 0x00000001;
 

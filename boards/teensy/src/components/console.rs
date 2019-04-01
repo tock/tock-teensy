@@ -1,38 +1,81 @@
-use capsules;
-use mk66;
-use kernel;
-use kernel::hil::uart::UART;
-use components::Component;
+//! Component for Console on the teensy board.
+//!
+//! This provides one Component, ConsoleComponent, which implements a
+//! buffered read/write console over a serial port. It attaches kernel
+//! debug output to this console (for panic!, print!, debug!, etc.).
+//!
 
-pub struct UartConsoleComponent;
+// Author: Philip Levis <pal@cs.stanford.edu>
+// Last modified: 3/31/2019
 
-impl UartConsoleComponent {
-    pub fn new() -> Self {
-        UartConsoleComponent {}
+#![allow(dead_code)] // Components are intended to be conditionally included
+
+use capsules::console;
+use capsules::virtual_uart::{MuxUart, UartDevice};
+use kernel::capabilities;
+use kernel::component::Component;
+use kernel::create_capability;
+use kernel::hil;
+use kernel::static_init;
+
+pub struct ConsoleComponent {
+    board_kernel: &'static kernel::Kernel,
+    uart_mux: &'static MuxUart<'static>,
+}
+
+impl ConsoleComponent {
+    pub fn new(
+        board_kernel: &'static kernel::Kernel,
+        uart_mux: &'static MuxUart,
+    ) -> ConsoleComponent {
+        ConsoleComponent {
+            board_kernel: board_kernel,
+            uart_mux: uart_mux,
+        }
     }
 }
 
-impl Component for UartConsoleComponent {
-    type Output = &'static capsules::console::Console<'static, mk66::uart::Uart>;
+impl Component for ConsoleComponent {
+    type Output = &'static console::Console<'static>;
 
-    unsafe fn finalize(&mut self) -> Option<Self::Output> {
+    unsafe fn finalize(&mut self) -> Self::Output {
+        let grant_cap = create_capability!(capabilities::MemoryAllocationCapability);
+
+        // Create virtual device for console.
+        let console_uart = static_init!(UartDevice, UartDevice::new(self.uart_mux, true));
+        console_uart.setup();
+
         let console = static_init!(
-                capsules::console::Console<mk66::uart::Uart>,
-                capsules::console::Console::new(&mk66::uart::UART0,
-                                                115200,
-                                                &mut capsules::console::WRITE_BUF,
-                                                &mut capsules::console::READ_BUF,
-                                                kernel::Grant::create())
-            );
-        mk66::uart::UART0.set_client(console);
-        console.initialize();
+            console::Console<'static>,
+            console::Console::new(
+                console_uart,
+                &mut console::WRITE_BUF,
+                &mut console::READ_BUF,
+                self.board_kernel.create_grant(&grant_cap)
+            )
+        );
+        hil::uart::Transmit::set_transmit_client(console_uart, console);
+        hil::uart::Receive::set_receive_client(console_uart, console);
 
-        let kc = static_init!(
-                capsules::console::App,
-                capsules::console::App::default()
-            );
-        kernel::debug::assign_console_driver(Some(console), kc);
+        // Create virtual device for kernel debug.
+        let debugger_uart = static_init!(UartDevice, UartDevice::new(self.uart_mux, false));
+        debugger_uart.setup();
+        let debugger = static_init!(
+            kernel::debug::DebugWriter,
+            kernel::debug::DebugWriter::new(
+                debugger_uart,
+                &mut kernel::debug::OUTPUT_BUF,
+                &mut kernel::debug::INTERNAL_BUF,
+            )
+        );
+        hil::uart::Transmit::set_transmit_client(debugger_uart, debugger);
 
-        Some(console)
+        let debug_wrapper = static_init!(
+            kernel::debug::DebugWriterWrapper,
+            kernel::debug::DebugWriterWrapper::new(debugger)
+        );
+        kernel::debug::set_debug_writer_wrapper(debug_wrapper);
+
+        console
     }
 }

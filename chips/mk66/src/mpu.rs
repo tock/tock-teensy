@@ -11,16 +11,24 @@
 //! - Author: Conor McAvity <cmcavity@stanford.edu>
 //! - Updated to 1.3 MPU interface by Philip Levis <pal@cs.stanford.edu>
 
+use core::cmp;
+
 use kernel::common::registers::{register_bitfields, FieldValue, ReadOnly, ReadWrite};
 use kernel::common::StaticRef;
 use kernel::mpu;
 
+// The K66 MPU gives the maximum permissions of overlapping regions and
+// does not support subregions like the CortexM. Therefore we need to
+// represent the grant region as a separate 
 const APP_MEMORY_REGION_NUM: usize = 0;
+const GRANT_MEMORY_REGION_NUM: usize = 1;
+const MEMORY_ALIGNMENT: usize = 32;
+const NUM_REGIONS: usize = 11;
 
 #[derive(Copy, Clone)]
 pub struct K66Config {
     // There are 12 regions, but the first is reserved for the debugger
-    regions: [K66ConfigRegion; 11],
+    regions: [K66ConfigRegion; NUM_REGIONS],
 }
 
 #[repr(C)]
@@ -34,8 +42,8 @@ struct K66ErrorRegisters {
 #[derive(Clone, Copy)]
 struct K66ConfigRegion {
     location: Option<(usize, usize)>,
-    permissions: mpu::Permissions,
-    super_as_user: bool,
+    super_only: bool,
+    user_permissions: mpu::Permissions,
     rgd_word0: FieldValue<u32, RegionDescriptorWord0::Register>,
     rgd_word1: FieldValue<u32, RegionDescriptorWord1::Register>,
     rgd_word2: FieldValue<u32, RegionDescriptorWord2::Register>,
@@ -54,23 +62,26 @@ struct K66RegionRegisters {
 
 
 impl K66ConfigRegion {
-    fn new(start: usize, end: usize, 
-           permissions: mpu::Permissions, 
-           super_as_user: bool) -> K66ConfigRegion {
-
-        let user_val: u8 = match permissions {
-            mpu::Permissions::ReadWriteExecute => 0b111,
-            mpu::Permissions::ReadWriteOnly    => 0b110,
-            mpu::Permissions::ReadExecuteOnly  => 0b101,
-            mpu::Permissions::ReadOnly         => 0b100,
-            mpu::Permissions::ExecuteOnly      => 0b001,
-        };
-        let super_val = if super_as_user { 0b11 } else { 0 };
+    fn new(start: usize, end: usize,
+           super_only: bool,
+           user_permissions: mpu::Permissions) -> K66ConfigRegion {
         
+        let user_val: u8 = match super_only {
+            true => 0b000, // If super only, ignore user permissions
+            false => match user_permissions {
+                mpu::Permissions::ReadWriteExecute => 0b111,
+                mpu::Permissions::ReadWriteOnly    => 0b110,
+                mpu::Permissions::ReadExecuteOnly  => 0b101,
+                mpu::Permissions::ReadOnly         => 0b100,
+                mpu::Permissions::ExecuteOnly      => 0b001,
+            }
+        };
+        let super_val = 0b00; // Always access
+
         K66ConfigRegion {
             location: Some((start, end)),
-            permissions: permissions,
-            super_as_user: super_as_user,
+            super_only: super_only,
+            user_permissions: user_permissions,
             rgd_word0: RegionDescriptorWord0::SRTADDR.val(start as u32 >> 5),
             rgd_word1: RegionDescriptorWord1::ENDADDR.val(end as u32 >> 5),
             rgd_word2: RegionDescriptorWord2::M0SM.val(super_val) + 
@@ -83,8 +94,8 @@ impl K66ConfigRegion {
     fn empty() -> K66ConfigRegion {
         K66ConfigRegion {
             location: None,
-            permissions: mpu::Permissions::ReadOnly,
-            super_as_user: false,
+            super_only: true,
+            user_permissions: mpu::Permissions::ReadOnly,
             rgd_word0: RegionDescriptorWord0::SRTADDR::CLEAR, 
             rgd_word1: RegionDescriptorWord1::ENDADDR::CLEAR, 
             rgd_word2: RegionDescriptorWord2::M0UM::CLEAR, 
@@ -104,6 +115,10 @@ impl K66ConfigRegion {
         self.location
     }
 
+    fn set_location(&mut self, val: (usize, usize)) {
+        self.location.replace(val);
+    }
+    
     fn base_address(&self) -> usize {
         self.location.map_or(0, |(start, _)| start)
     }
@@ -111,14 +126,18 @@ impl K66ConfigRegion {
     fn end_address(&self) -> usize {
         self.location.map_or(0, |(_, end)| end)
     }
-  
-    fn supervisor_as_user(&self) -> bool {
-        self.super_as_user
+    
+    fn supervisor_only(&self) -> bool {
+        self.super_only
     }
     
     fn user_permissions(&self) -> mpu::Permissions {
-        self.permissions
-    } 
+        self.user_permissions
+    }
+
+    fn set_user_permissions(&mut self, permissions: mpu::Permissions) {
+        self.user_permissions = permissions;
+    }
 
 }
 #[repr(C)]
@@ -308,7 +327,17 @@ impl K66Mpu {
         // Check that region number is valid and both the start/size
         // are evenly divisible by 32, since that is the MPU allocation
         // granularity
-        region_num <= 11 && start % 32 == 0 && size % 32 == 0 
+        region_num <= NUM_REGIONS &&
+        start % MEMORY_ALIGNMENT == 0 &&
+        size % MEMORY_ALIGNMENT == 0 
+    }
+
+    fn align_up(&self, size: usize) -> usize {
+        (size + (MEMORY_ALIGNMENT - 1)) & (MEMORY_ALIGNMENT - 1)
+    }
+
+    fn align_down(&self, size: usize) -> usize{
+        size & (MEMORY_ALIGNMENT - 1)
     }
 }
 
@@ -380,7 +409,7 @@ impl mpu::MPU for K66Mpu {
         }
         let region_num = config.unused_region_number()?;
 
-        let mut start = unallocated_memory_start as usize;
+        let start = unallocated_memory_start as usize;
 
         if !self.region_valid(region_num, start, unallocated_memory_size) {
             debug!("MPU error: invalid memory region: region_num={}, start={}, unallocated_memory_size={}\n", region_num, start, unallocated_memory_size);
@@ -388,13 +417,15 @@ impl mpu::MPU for K66Mpu {
         }
 
         // The end address register is always 31 modulo 32
-        let end = (start + unallocated_memory_size - 1) & !0x1f;
-
+        let end = (start + min_region_size - 1) & !0x1f;
+        if (end - start) > unallocated_memory_size {
+            return None;
+        }
         // Allocate a new region with these permissions and supervisor has full
         // permissions.
-        let region = unsafe { K66ConfigRegion::new(start, end, access, false) };
+        let region = K66ConfigRegion::new(start, end, false, access);
         config.regions[region_num] = region;
-        let start_addr = unsafe {start as *const u8};
+        let start_addr = start as *const u8;
         let size: usize = (end - start) as usize;
         let region = mpu::Region::new(start_addr, size);
         Some(region)
@@ -418,8 +449,35 @@ impl mpu::MPU for K66Mpu {
             debug!("MPU error: cannot allocate memory region: unallocated block {}-{} is not empty.\n", unallocated_memory_start as usize, unallocated_memory_size);
             return None;
         }
-        let region_num = config.unused_region_number()?;
- 
+        
+        let initial_kernel_memory_size = self.align_up(initial_kernel_memory_size);
+        let initial_app_memory_size = self.align_up(initial_app_memory_size);
+        let start = self.align_up(unallocated_memory_start as usize);
+        
+        let initial_memory = initial_kernel_memory_size + initial_app_memory_size;
+        let size = cmp::max(min_memory_size, initial_memory);
+        let end = start + size;
+        
+        if size > unallocated_memory_size {
+            debug!("Cannot load process: requires {} bytes of RAM but only {} available.\n", size, unallocated_memory_size);
+            return None;
+        }
+        let app_region = K66ConfigRegion::new(start,
+                                              initial_app_memory_size,
+                                              false,
+                                              permissions);
+        
+        // Grant grows down from top of memory block
+        let grant_start = end - initial_kernel_memory_size;
+        let grant_region = K66ConfigRegion::new(grant_start,
+                                                initial_kernel_memory_size,
+                                                true,
+                                                mpu::Permissions::ExecuteOnly);
+        
+        config.regions[APP_MEMORY_REGION_NUM] = app_region;
+        config.regions[GRANT_MEMORY_REGION_NUM] = grant_region;
+
+        Some((start as *const u8, size))
     }
 
     fn update_app_memory_region(
@@ -429,7 +487,28 @@ impl mpu::MPU for K66Mpu {
         permissions: mpu::Permissions,
         config: &mut Self::MpuConfig,
     ) -> Result<(), ()> {
-  
+        let new_app_end = app_memory_break as usize;
+        let new_grant_start = kernel_memory_break as usize;
+
+        let app_memory: Option<(usize, usize)> = config.regions[APP_MEMORY_REGION_NUM].location;
+        let grant_memory : Option<(usize, usize)> = config.regions[GRANT_MEMORY_REGION_NUM].location;
+        
+        if app_memory.is_none() || grant_memory.is_none() {
+            return Err(())
+        }
+
+        let (app_start, app_end) = app_memory.map_or((0, 0), |loc| loc);
+        let (grant_start, grant_end) = grant_memory.map_or((0, 0), |loc| loc);
+
+        // Can't grow regions into each other
+        if new_app_end > grant_start || new_grant_start < app_end {
+            return Err(());
+        }
+
+        config.regions[APP_MEMORY_REGION_NUM].set_location((app_start, new_app_end));
+        config.regions[APP_MEMORY_REGION_NUM].set_user_permissions(permissions);
+        config.regions[GRANT_MEMORY_REGION_NUM].set_location((new_grant_start, grant_end));
+        Ok(())
     }
 
     fn configure_mpu(&self, config: &Self::MpuConfig) {
@@ -439,16 +518,20 @@ impl mpu::MPU for K66Mpu {
             let end_address = region.end_address();
 
             let permissions = region.user_permissions();
-            let user: u32 = match permissions {
-                mpu::Permissions::ReadWriteExecute => 0b111,
-                mpu::Permissions::ReadWriteOnly    => 0b110,
-                mpu::Permissions::ReadExecuteOnly  => 0b101,
-                mpu::Permissions::ReadOnly         => 0b100,
-                mpu::Permissions::ExecuteOnly      => 0b001,
+            let super_only = region.supervisor_only();
+            let user: u32 = match super_only {
+                true => 0b000,
+                false =>  match permissions {
+                    mpu::Permissions::ReadWriteExecute => 0b111,
+                    mpu::Permissions::ReadWriteOnly    => 0b110,
+                    mpu::Permissions::ReadExecuteOnly  => 0b101,
+                    mpu::Permissions::ReadOnly         => 0b100,
+                    mpu::Permissions::ExecuteOnly      => 0b001,
+                }
             };
-            
-            let super_as_user = region.supervisor_as_user();
-            let supervisor = if super_as_user {0b11} else {0b00};
+
+            // Supervisor always has full access (0b00)
+            let supervisor = 0b00;
             
             let start = base_address >> 5; 
             let end = end_address >> 5;
@@ -457,11 +540,11 @@ impl mpu::MPU for K66Mpu {
             // with i=0..10 refer to regions 1.11.
             let region_num = i + 1; 
             // Write to region descriptor
-            regs.rgds[i].rgd_word0.write(RegionDescriptorWord0::SRTADDR.val(start as u32));
-            regs.rgds[i].rgd_word1.write(RegionDescriptorWord1::ENDADDR.val(end as u32));
-            regs.rgds[i].rgd_word2.write(RegionDescriptorWord2::M3UM.val(user));
-            regs.rgds[i].rgd_word2.write(RegionDescriptorWord2::M3SM.val(supervisor));
-            regs.rgds[i].rgd_word3.write(RegionDescriptorWord3::VLD::SET);
+            regs.rgds[region_num].rgd_word0.write(RegionDescriptorWord0::SRTADDR.val(start as u32));
+            regs.rgds[region_num].rgd_word1.write(RegionDescriptorWord1::ENDADDR.val(end as u32));
+            regs.rgds[region_num].rgd_word2.write(RegionDescriptorWord2::M3UM.val(user));
+            regs.rgds[region_num].rgd_word2.write(RegionDescriptorWord2::M3SM.val(supervisor));
+            regs.rgds[region_num].rgd_word3.write(RegionDescriptorWord3::VLD::SET);
         }
     }
 }

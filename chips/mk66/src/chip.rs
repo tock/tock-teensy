@@ -1,5 +1,5 @@
 use cortexm4;
-use kernel::Chip;
+use kernel;
 use pit;
 use spi;
 use gpio;
@@ -25,7 +25,7 @@ impl MK66 {
     }
 }
 
-impl Chip for MK66 {
+impl kernel::Chip for MK66 {
     type MPU = mpu::K66Mpu;
     type SysTick = cortexm4::systick::SysTick;
     type UserspaceKernelBoundary = cortexm4::syscall::SysCall;

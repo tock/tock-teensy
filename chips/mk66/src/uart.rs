@@ -165,7 +165,7 @@ pub static mut UART3: Uart = Uart::new(3);
 pub static mut UART4: Uart = Uart::new(4);
 
 impl<'a> Uart<'a> {
-    pub fn new(index: usize) -> Uart<'a> {
+    const fn new(index: usize) -> Uart<'a> {
         Uart {
             index: index,
             registers: UART_BASE_ADDRS[index],
@@ -331,7 +331,7 @@ impl<'a> hil::uart::Transmit<'a> for Uart<'a> {
         (ReturnCode::SUCCESS, None)
     }
 
-    fn transmit_word(&self, tx_data: u32) -> ReturnCode {
+    fn transmit_word(&self, _tx_data: u32) -> ReturnCode {
         ReturnCode::FAIL
     }
 
@@ -359,7 +359,7 @@ impl<'a> hil::uart::Configure for Uart<'a> {
 
 impl<'a> hil::uart::Receive<'a> for Uart<'a> {
     fn receive_buffer(&self, rx_buffer: &'static mut [u8], rx_len: usize) -> (ReturnCode, Option<&'static mut [u8]>) {
-        let mut length = rx_len;
+        let length = rx_len;
         if rx_len > rx_buffer.len() {
             return (ReturnCode::ESIZE, Some(rx_buffer));
         }

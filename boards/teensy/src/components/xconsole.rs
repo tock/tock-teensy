@@ -1,7 +1,7 @@
 use mk66;
 use kernel;
 use xconsole;
-use kernel::hil::uart::UART;
+use kernel::hil::uart::{Transmit, Receive};
 use components::Component;
 
 pub struct XConsoleComponent;
@@ -24,7 +24,7 @@ impl Component for XConsoleComponent {
                                         &mut xconsole::READ_BUF,
                                         kernel::Grant::create())
             );
-        mk66::uart::UART0.set_client(xconsole);
+        mk66::uart::UART0.set_transmit_client(xconsole);
         xconsole.initialize();
 
         let kc = static_init!(

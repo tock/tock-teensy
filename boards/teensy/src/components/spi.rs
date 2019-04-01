@@ -1,8 +1,11 @@
-use mk66;
 use capsules::virtual_spi::{VirtualSpiMasterDevice, MuxSpiMaster};
-use kernel::hil::spi::SpiMaster;
-use spi::Spi;
 use components::Component;
+use kernel::hil::spi::SpiMaster;
+use kernel::static_init;
+use mk66;
+use spi::Spi;
+
+
 
 pub struct VirtualSpiComponent;
 

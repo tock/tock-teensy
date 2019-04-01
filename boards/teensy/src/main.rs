@@ -4,7 +4,6 @@
 
 extern crate capsules;
 
-#[macro_use(debug, static_init, register_bitfields, register_bitmasks)]
 extern crate kernel;
 
 #[allow(dead_code)]
@@ -22,16 +21,29 @@ mod spi;
 #[allow(dead_code)]
 mod components;
 
-pub mod xconsole;
+//pub mod xconsole;
 
 #[allow(dead_code)]
 mod pins;
 
 use components::*;
+use kernel::{create_capability, static_init};
+use kernel::capabilities;
+
+const NUM_PROCS: usize = 1;
+
+// Total memory allocated to the processes
+#[link_section = ".app_memory"]
+static mut APP_MEMORY: [u8; 1 << 17] = [0; 1 << 17];
+
+// How the kernel responds when a process faults
+const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultResponse::Panic;
+
+static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] = [None; NUM_PROCS];
 
 #[allow(unused)]
 struct Teensy {
-    xconsole: <XConsoleComponent as Component>::Output,
+    //xconsole: <XConsoleComponent as Component>::Output,
     gpio: <GpioComponent as Component>::Output,
     led: <LedComponent as Component>::Output,
     alarm: <AlarmComponent as Component>::Output,
@@ -45,7 +57,7 @@ impl kernel::Platform for Teensy {
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
         match driver_num {
-            xconsole::DRIVER_NUM => f(Some(self.xconsole)),
+            //xconsole::DRIVER_NUM => f(Some(self.xconsole)),
             capsules::gpio::DRIVER_NUM => f(Some(self.gpio)),
 
             capsules::alarm::DRIVER_NUM => f(Some(self.alarm)),
@@ -83,60 +95,58 @@ pub unsafe fn reset_handler() {
     use mk66::sim::Clock;
     mk66::sim::clocks::PORTABCDE.enable();
 
+    let process_mgmt_cap = create_capability!(capabilities::ProcessManagementCapability);
+    let main_cap = create_capability!(capabilities::MainLoopCapability);
+    let grant_cap = create_capability!(capabilities::MemoryAllocationCapability);
+    let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
+
+    
     let (gpio_pins, led_pins) = pins::configure_all_pins();
-    let gpio = GpioComponent::new()
+    let gpio = GpioComponent::new(board_kernel)
                              .dependency(gpio_pins)
                              .finalize().unwrap();
     let led = LedComponent::new()
                            .dependency(led_pins)
                            .finalize().unwrap();
     let spi = VirtualSpiComponent::new().finalize().unwrap();
-    let alarm = AlarmComponent::new().finalize().unwrap();
-    let xconsole = XConsoleComponent::new().finalize().unwrap();
-    let rng = RngaComponent::new().finalize().unwrap();
+    let alarm = AlarmComponent::new(board_kernel).finalize().unwrap();
+    //let xconsole = XConsoleComponent::new().finalize().unwrap();
+    let rng = RngaComponent::new(board_kernel).finalize().unwrap();
 
+    
     let teensy = Teensy {
-        xconsole: xconsole,
+        //xconsole: xconsole,
         gpio: gpio,
         led: led,
         alarm: alarm,
         spi: spi,
         rng: rng,
-        ipc: kernel::ipc::IPC::new(),
+        ipc: kernel::ipc::IPC::new(board_kernel, &grant_cap),
     };
 
-    let mut chip = mk66::chip::MK66::new();
+    let chip = static_init!(mk66::chip::MK66, mk66::chip::MK66::new());
 
     if tests::TEST {
         tests::test();
     }
-    kernel::kernel_loop(&teensy, &mut chip, load_processes(), Some(&teensy.ipc));
-}
 
 
-unsafe fn load_processes() -> &'static mut [Option<&'static mut kernel::procs::Process<'static>>] {
+
     extern "C" {
         /// Beginning of the ROM region containing the app images.
         static _sapps: u8;
     }
-
-    const NUM_PROCS: usize = 1;
-
-    // Total memory allocated to the processes
-    #[link_section = ".app_memory"]
-    static mut APP_MEMORY: [u8; 1 << 17] = [0; 1 << 17];
-
-    // How the kernel responds when a process faults
-    const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultResponse::Panic;
-
-    static mut PROCESSES: [Option<&'static mut kernel::procs::Process<'static>>; NUM_PROCS] = [None];
-
+    
     kernel::procs::load_processes(
+        board_kernel,
+        chip,
         &_sapps as *const u8,
         &mut APP_MEMORY,
         &mut PROCESSES,
         FAULT_RESPONSE,
+        &process_mgmt_cap,
     );
-
-    &mut PROCESSES
+    
+    board_kernel.kernel_loop(&teensy, chip, Some(&teensy.ipc), &main_cap);
 }
+

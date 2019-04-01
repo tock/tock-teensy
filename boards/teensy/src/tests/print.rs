@@ -1,4 +1,5 @@
 use tests::{blink, alarm};
+use kernel::debug;
 
 pub fn print_test() {
     alarm::loop_500ms(|| {
