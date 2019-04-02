@@ -7,25 +7,26 @@
  *
  * [Teensy 3.6 Schematic]
  */
-ROM_ORIGIN  = 0x00000000;
-ROM_LENGTH  = 0x00020000;
-
 /**
  * Program flash is 1M total.
  *
  * [Kinetis K66 Sub-Family Reference Manual Section 2.3]
  * [Teensy 3.6 Schematic]
  */
-PROG_ORIGIN = 0x00020000;
-PROG_LENGTH = 0x000E0000;
-
 /**
  * SRAM is 256K total, split into an upper 192K chunk and a lower 64K chunk.
  *
  * [Kinetis K66 Sub-Family Reference Manual Section 4.10]
  */
 RAM_ORIGIN  = 0x20000000;
-RAM_LENGTH  = 192K;
+/* Memory Spaces Definitions, 448K flash, 64K ram */
+/* Use bootloader starting at 0x0000 */
+MEMORY
+{
+  rom (rx)  : ORIGIN = 0x00000000, LENGTH = 0x00020000
+  prog (rx) : ORIGIN = 0x00020000, LENGTH = 0x000E0000
+  ram (rwx) : ORIGIN = 0x20000000, LENGTH = 192K
+}
 
 /**
  * Minimum memory protection unit alignment size.
