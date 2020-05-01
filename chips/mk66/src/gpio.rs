@@ -259,21 +259,37 @@ impl<'a> Gpio<'a> {
         self.regs().clear[self.index()].set(1);
     }
 
-    pub fn set_input_mode(&self, mode: hil::gpio::InputMode) {
+    pub fn set_floating_state(&self, mode: hil::gpio::FloatingState) {
         let config = match mode {
-            hil::gpio::InputMode::PullUp => PinControl::PE::SET + PinControl::PS::PullUp,
-            hil::gpio::InputMode::PullDown => PinControl::PE::SET + PinControl::PS::PullDown,
-            hil::gpio::InputMode::PullNone => PinControl::PE::CLEAR,
+            hil::gpio::FloatingState::PullUp => PinControl::PE::SET + PinControl::PS::PullUp,
+            hil::gpio::FloatingState::PullDown => PinControl::PE::SET + PinControl::PS::PullDown,
+            hil::gpio::FloatingState::PullNone => PinControl::PE::CLEAR,
         };
 
         self.port.regs().pcr[self.index()].modify(config);
     }
 
-    pub fn set_interrupt_mode(&self, mode: hil::gpio::InterruptMode) {
+    pub fn floating_state(&self) -> hil::gpio::FloatingState {
+        let enable = self.port.regs().pcr[self.index()].read(PinControl::PE);
+        let direction = self.port.regs().pcr[self.index()].read(PinControl::PS);
+        match (enable, direction) {
+            (PinControl::PE::CLEAR, _) => {
+                hil::gpio::FloatingState::PullNone
+            },
+            (PinControl::PE::SET, PinControl::PS::PullUp) => {
+                hil::gpio::FloatingState::PullUp
+            },
+            (PinControl::PE::SET, PinControl::PS::PullDown) => {
+                hil::gpio::FloatingState::PullDown
+            }
+        }
+    }
+
+    pub fn set_interrupt_mode(&self, mode: hil::gpio::InterruptEdge) {
         let config = match mode {
-            hil::gpio::InterruptMode::RisingEdge => PinControl::IRQC::InterruptRisingEdge,
-            hil::gpio::InterruptMode::FallingEdge => PinControl::IRQC::InterruptFallingEdge,
-            hil::gpio::InterruptMode::EitherEdge => PinControl::IRQC::InterruptEitherEdge
+            hil::gpio::InterruptEdge::RisingEdge => PinControl::IRQC::InterruptRisingEdge,
+            hil::gpio::InterruptEdge::FallingEdge => PinControl::IRQC::InterruptFallingEdge,
+            hil::gpio::InterruptEdge::EitherEdge => PinControl::IRQC::InterruptEitherEdge
         };
 
         self.port.regs().pcr[self.index()].modify(config);
@@ -334,7 +350,7 @@ impl<'a, P: PinNum> hil::Controller for Pin<'a, P> {
 }
 
 impl<'a> hil::Controller for Gpio<'a> {
-    type Config = (hil::gpio::InputMode, hil::gpio::InterruptMode);
+    type Config = (hil::gpio::FloatingState, hil::gpio::InterruptEdge);
 
     fn configure(&self, config: Self::Config) {
         self.set_input_mode(config.0);
@@ -342,14 +358,12 @@ impl<'a> hil::Controller for Gpio<'a> {
     }
 }
 
-impl<'a> hil::gpio::PinCtl for Gpio<'a> {
-    fn set_input_mode(&self, mode: hil::gpio::InputMode) {
-        Gpio::set_input_mode(self, mode);
+impl<'a> hil::gpio::Configure for Gpio<'a> {
+    fn disable_input(&self) {
+        unimplemented!();
     }
-}
 
-impl<'a> hil::gpio::Pin for Gpio<'a> {
-    fn disable(&self) {
+    fn disable_output(&self) {
         unimplemented!();
     }
 
@@ -361,10 +375,26 @@ impl<'a> hil::gpio::Pin for Gpio<'a> {
         self.disable_output();
     }
 
+    fn set_floating_state(&self, mode: hil::gpio::FloatingState) {
+        Gpio::set_floating_state(self, mode);
+    }
+
+    fn floating_state(&self) -> hil::gpio::FloatingState {
+        Gpio::floating_state(self)
+    }
+
+    fn deactivate_to_low_power(&self) {
+        unimplemented!();
+    }
+}
+
+impl<'a> hil::gpio::Input for Gpio<'a> {
     fn read(&self) -> bool {
         self.read()
     }
+}
 
+impl<'a> hil::gpio::Output for Gpio<'a> {
     fn toggle(&self) {
         self.toggle();
     }
@@ -376,16 +406,26 @@ impl<'a> hil::gpio::Pin for Gpio<'a> {
     fn clear(&self) {
         self.clear();
     }
+}
 
-    fn enable_interrupt(&self, client_data: usize, mode: hil::gpio::InterruptMode) {
+impl<'a> hil::gpio::Interrupt for Gpio<'a> {
+    fn set_client(&self, client: &'static dyn hil::gpio::Client) {
+        Gpio::set_client(self, client);
+    }
+
+    fn enable_interrupts(&self, client_data: usize, mode: hil::gpio::InterruptEdge) {
         Gpio::enable_interrupt(self);
         self.set_interrupt_mode(mode);
         self.set_client_data(client_data);
     }
 
-    fn disable_interrupt(&self) {
+    fn disable_interrupts(&self) {
         Gpio::disable_interrupt(self);
     }
+
+    fn is_pending(&self) -> bool {
+        false
+    } 
 }
 
 macro_rules! pins {
