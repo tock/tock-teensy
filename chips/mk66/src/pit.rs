@@ -1,6 +1,6 @@
 use core::mem;
 use core::cell::Cell;
-use kernel::hil::time::{Client, Time, Alarm, Frequency};
+use kernel::hil::time::{AlarmClient, Time, Alarm, Frequency};
 use nvic;
 use clock::peripheral_clock_hz;
 
@@ -48,7 +48,7 @@ pub const PIT_ADDRS: [*mut PitRegisters; 4] = [0x4003_7100 as *mut PitRegisters,
 pub static mut PIT: Pit<'static> = Pit::new();
 
 pub struct Pit<'a> {
-    pub client: Cell<Option<&'a Client>>,
+    pub client: Cell<Option<&'a AlarmClient>>,
     alarm: Cell<u32>
 }
 
@@ -119,7 +119,7 @@ impl<'a> Pit<'a> {
         self.pit(2).tctrl.modify(TimerControl::TIE::CLEAR);
     }
 
-    pub fn set_client(&self, client: &'a Client) {
+    pub fn set_client(&self, client: &'a AlarmClient) {
         self.client.set(Some(client));
     }
 
