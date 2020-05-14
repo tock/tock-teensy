@@ -27,8 +27,8 @@ pub mod pit;
 pub mod spi;
 pub mod mpu;
 
-#[allow(while_true)]
-pub mod rnga;
+//#[allow(while_true)]
+//pub mod rnga;
 
 use cortexm4::{generic_isr, svc_handler, hard_fault_handler, systick_handler};
 

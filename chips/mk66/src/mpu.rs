@@ -12,6 +12,7 @@
 //! - Updated to 1.3 MPU interface by Philip Levis <pal@cs.stanford.edu>
 
 use core::cmp;
+use core::fmt;
 
 use kernel::common::registers::{register_bitfields, FieldValue, ReadOnly, ReadWrite};
 use kernel::common::StaticRef;
@@ -336,6 +337,7 @@ impl K66Mpu {
         (size + (MEMORY_ALIGNMENT - 1)) & (MEMORY_ALIGNMENT - 1)
     }
 
+#[allow(dead_code)]
     fn align_down(&self, size: usize) -> usize{
         size & (MEMORY_ALIGNMENT - 1)
     }
@@ -546,5 +548,12 @@ impl mpu::MPU for K66Mpu {
             regs.rgds[region_num].rgd_word2.write(RegionDescriptorWord2::M3SM.val(supervisor));
             regs.rgds[region_num].rgd_word3.write(RegionDescriptorWord3::VLD::SET);
         }
+    }
+}
+
+impl fmt::Display for K66Config {
+
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "\r\nK66 MPU Config not printable yet.")
     }
 }

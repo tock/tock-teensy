@@ -1,4 +1,4 @@
-use capsules::led::ActivationMode;
+use kernel::hil::gpio::ActivationMode;
 use kernel::static_init;
 use mk66;
 

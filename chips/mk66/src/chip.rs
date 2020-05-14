@@ -1,3 +1,5 @@
+use core::fmt::Write;
+
 use cortexm4;
 use kernel;
 use pit;
@@ -80,5 +82,9 @@ impl kernel::Chip for MK66 {
         F: FnOnce() -> R,
     {
         cortexm4::support::atomic(f)
+    }
+
+    unsafe fn print_state(&self, writer: &mut dyn Write) {
+        cortexm4::print_cortexm4_state(writer);
     }
 }

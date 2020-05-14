@@ -151,8 +151,8 @@ register_bitfields! {u8,
 pub struct Uart<'a> {
     index: usize,
     registers: *mut Registers,
-    receive_client: OptionalCell<&'a uart::ReceiveClient>,
-    transmit_client: OptionalCell<&'a uart::TransmitClient>,
+    receive_client: OptionalCell<&'a dyn uart::ReceiveClient>,
+    transmit_client: OptionalCell<&'a dyn uart::TransmitClient>,
     rx_buffer: TakeCell<'static, [u8]>,
     rx_len: Cell<usize>,
     rx_index: Cell<usize>
@@ -313,7 +313,7 @@ impl<'a> Uart<'a> {
 
 /// Implementation of kernel::hil::UART
 impl<'a> hil::uart::Transmit<'a> for Uart<'a> {
-    fn set_transmit_client(&self, client: &'a hil::uart::TransmitClient) {
+    fn set_transmit_client(&self, client: &'a dyn hil::uart::TransmitClient) {
         self.transmit_client.replace(client);
     }
 
@@ -377,7 +377,7 @@ impl<'a> hil::uart::Receive<'a> for Uart<'a> {
         ReturnCode::FAIL
     }
  
-    fn set_receive_client(&self, client: &'a uart::ReceiveClient) {
+    fn set_receive_client(&self, client: &'a dyn uart::ReceiveClient) {
         self.receive_client.replace(client);
     }
 }

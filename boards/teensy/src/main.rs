@@ -3,11 +3,10 @@
 #![feature(asm,const_fn,lang_items)]
 
 extern crate capsules;
-
 extern crate kernel;
-
 #[allow(dead_code)]
 extern crate mk66;
+extern crate components;
 
 #[macro_use]
 pub mod io;
@@ -18,17 +17,22 @@ mod tests;
 #[allow(dead_code)]
 mod spi;
 
-#[allow(dead_code)]
-mod components;
+//#[allow(dead_code)]
+//mod components;
 
 //pub mod xconsole;
 
 #[allow(dead_code)]
 mod pins;
 
-use components::*;
 use kernel::{create_capability, static_init};
 use kernel::capabilities;
+use kernel::component::Component;
+
+use components::spi::{SpiComponent, SpiSyscallComponent};
+use components::process_console::ProcessConsoleComponent;
+use components::led::LedsComponent;
+use components::gpio::GpioComponent;
 
 const NUM_PROCS: usize = 1;
 
@@ -44,11 +48,10 @@ static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] =
 #[allow(unused)]
 struct Teensy {
     //xconsole: <XConsoleComponent as Component>::Output,
-    gpio: <GpioComponent as Component>::Output,
-    led: <LedComponent as Component>::Output,
-    alarm: <AlarmComponent as Component>::Output,
-    spi: <VirtualSpiComponent as Component>::Output,
-    rng: <RngaComponent as Component>::Output,
+    gpio: &'static capsules::gpio::GPIO<'static>,
+    led: &'static capsules::led::LED<'static>,
+    alarm: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, mk66::pit::Pit<static>>>,
+    spi: &'static capsules::spi::SPit<'static, VirtualSpiMasterDevice<'static, mk66::spi::Spi>>,
     ipc: kernel::ipc::IPC,
 }
 
@@ -102,16 +105,19 @@ pub unsafe fn reset_handler() {
 
     
     let (gpio_pins, led_pins) = pins::configure_all_pins();
-    let gpio = GpioComponent::new(board_kernel)
-                             .dependency(gpio_pins)
-                             .finalize().unwrap();
-    let led = LedComponent::new()
-                           .dependency(led_pins)
-                           .finalize().unwrap();
-    let spi = VirtualSpiComponent::new().finalize().unwrap();
+    let gpio = GpioComponent::new(board_kernel).finalize(components::gpio_component_helper!(
+        gpio_pins));
+    let led = LedsComponent::new().finalize(components::led_component_helper!((
+        led_pins,
+        kernel::hil::gpio::ActivationMode::ActiveLow
+    )));
+    
+    let mux_spi = components::spi::SpiMuxComponent::new(&mk66::spi::SPI0)
+        .finalize(components::spi_mux_component_helper!(mk66::spi::Spi));
+
     let alarm = AlarmComponent::new(board_kernel).finalize().unwrap();
     //let xconsole = XConsoleComponent::new().finalize().unwrap();
-    let rng = RngaComponent::new(board_kernel).finalize().unwrap();
+    //    let rng = RngaComponent::new(board_kernel).finalize().unwrap();
 
     
     let teensy = Teensy {
@@ -120,7 +126,7 @@ pub unsafe fn reset_handler() {
         led: led,
         alarm: alarm,
         spi: spi,
-        rng: rng,
+//        rng: rng,
         ipc: kernel::ipc::IPC::new(board_kernel, &grant_cap),
     };
 

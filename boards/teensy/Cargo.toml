@@ -18,3 +18,5 @@ kernel = { path = "../../tock/kernel" }
 cortexm4 = { path = "../../tock/arch/cortex-m4" }
 capsules = { path = "../../tock/capsules" }
 mk66 = { path = "../../chips/mk66/" }
+components = { path = "../../tock/boards/components" }
+

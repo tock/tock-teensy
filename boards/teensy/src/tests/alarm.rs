@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use mk66::{gpio, clock, pit};
-use kernel::hil::time::{Time, Alarm, Frequency, Client};
+use kernel::hil::time::{Time, Alarm, Frequency, AlarmClient};
 use tests::blink;
 
 static mut INTERVAL: u32 = 18_000_000;
@@ -10,7 +10,7 @@ static mut UP: bool = false;
 static mut LAST_TIME: u32 = 0;
 
 struct LedClient;
-impl Client for LedClient {
+impl AlarmClient for LedClient {
     fn fired(&self) {
         unsafe {
             let now = pit::PIT.now();
@@ -42,7 +42,7 @@ struct LoopClient {
 }
 static mut LOOP: LoopClient = LoopClient { callback: None };
 
-impl Client for LoopClient {
+impl AlarmClient for LoopClient {
     fn fired(&self) {
         unsafe {
             self.callback.map(|cb| cb() );

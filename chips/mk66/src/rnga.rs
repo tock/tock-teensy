@@ -70,7 +70,7 @@ impl<'a> Entropy<'a> {
     pub fn init(&mut self) {
         // set clock gate
         let sim = unsafe { &*sim::SIM };
-        sim.scgc6.modify(sim::SystemClockGatingControl6::RNGA::SET);
+        sim.scgc6.modify(sim::clocks::SystemClockGatingControl6::RNGA::SET);
 
         // start rnga
         let regs = unsafe { &*self.regs };

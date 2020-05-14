@@ -6,7 +6,7 @@
 use core::cell::Cell;
 use core::sync::atomic::Ordering;
 use core::marker::PhantomData;
-use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT};
+use core::sync::atomic::{AtomicBool};
 use kernel::common::registers::{register_bitfields, ReadWrite, WriteOnly, ReadOnly};
 use core::mem;
 use kernel::hil;
@@ -85,8 +85,7 @@ pub enum PeripheralFunction {
 pub struct Port<'a> {
     regs: *mut PortRegisters,
     bitband: *mut GpioBitbandRegisters,
-    clients: [Cell<Option<&'a hil::gpio::Client>>; 32],
-    client_data: [Cell<usize>; 32]
+    clients: [Cell<Option<&'a dyn hil::gpio::Client>>; 32],
 }
 
 pub struct Pin<'a, P: PinNum> {
@@ -122,23 +121,6 @@ impl<'a> Port<'a> {
                       Cell::new(None), Cell::new(None),
                       Cell::new(None), Cell::new(None)
                 ],
-            client_data: [Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0),
-                          Cell::new(0), Cell::new(0)
-                ]
         }
     }
 
@@ -158,7 +140,7 @@ impl<'a> Port<'a> {
             if pin < self.clients.len() {
                 fired &= !(1 << pin);
                 self.clients[pin].get().map(|client| {
-                    client.fired(self.client_data[pin].get());
+                    client.fired();
                 });
             } else {
                 break;
@@ -179,7 +161,7 @@ impl<'a, P: PinNum> Pin<'a, P> {
             gpio: Gpio {
                 pin: P::PIN,
                 port: port,
-                valid: ATOMIC_BOOL_INIT
+                valid: AtomicBool::new(false),
             },
             _pin: PhantomData,
         }
@@ -189,10 +171,10 @@ impl<'a, P: PinNum> Pin<'a, P> {
         let already_allocated = self.gpio.valid.swap(true, Ordering::Relaxed);
         if already_allocated {
             let port_name = match self.gpio.pin {
-                0...31 => "A",
-                32...63 => "B",
-                64...95 => "C",
-                96...127 => "D",
+                0..=31 => "A",
+                32..=63 => "B",
+                64..=95 => "C",
+                96..=127 => "D",
                 _ => "E"
             };
             panic!("Requested GPIO pin P{}{} is already allocated.", port_name, self.gpio.index());
@@ -220,7 +202,6 @@ impl<'a, P: PinNum> Pin<'a, P> {
 
     pub fn release_claim(&self) {
         self.gpio.clear_client();
-        self.gpio.set_client_data(0);
         self.set_peripheral_function(PeripheralFunction::Alt0);
         self.gpio.valid.swap(false, Ordering::Relaxed);
     }
@@ -270,18 +251,18 @@ impl<'a> Gpio<'a> {
     }
 
     pub fn floating_state(&self) -> hil::gpio::FloatingState {
-        let enable = self.port.regs().pcr[self.index()].read(PinControl::PE);
-        let direction = self.port.regs().pcr[self.index()].read(PinControl::PS);
-        match (enable, direction) {
-            (PinControl::PE::CLEAR, _) => {
+        let enable = self.port.regs().pcr[self.index()].read(PinControl::PE) == 1;
+        let pullup = self.port.regs().pcr[self.index()].read(PinControl::PS) == 1;
+        match (enable, pullup) {
+            (false, _) => {
                 hil::gpio::FloatingState::PullNone
             },
-            (PinControl::PE::SET, PinControl::PS::PullUp) => {
-                hil::gpio::FloatingState::PullUp
-            },
-            (PinControl::PE::SET, PinControl::PS::PullDown) => {
+            (_, false) => {
                 hil::gpio::FloatingState::PullDown
             }
+            (_, true) => {
+                hil::gpio::FloatingState::PullUp
+            },
         }
     }
 
@@ -302,10 +283,10 @@ impl<'a> Gpio<'a> {
     fn enable_interrupt(&self) {
         unsafe {
             match self.pin {
-                0...31 => nvic::enable(NvicIdx::PCMA),
-                32...63 => nvic::enable(NvicIdx::PCMB),
-                64...95 => nvic::enable(NvicIdx::PCMC),
-                96...127 => nvic::enable(NvicIdx::PCMD),
+                0..=31 => nvic::enable(NvicIdx::PCMA),
+                32..=63 => nvic::enable(NvicIdx::PCMB),
+                64..=95 => nvic::enable(NvicIdx::PCMC),
+                96..=127 => nvic::enable(NvicIdx::PCMD),
                 _ => nvic::enable(NvicIdx::PCME)
             };
         }
@@ -324,7 +305,7 @@ impl<'a> Gpio<'a> {
         self.port.clients[self.index()].set(None);
     }
 
-    pub fn set_client<C: hil::gpio::Client>(&self, client: &'static C) {
+    pub fn set_client(&self, client: &'static dyn hil::gpio::Client) {
         if !self.valid.load(Ordering::Relaxed) {
             return;
         }
@@ -332,47 +313,25 @@ impl<'a> Gpio<'a> {
         self.port.clients[self.index()].set(Some(client));
     }
 
-    pub fn set_client_data(&self, data: usize) {
-        if !self.valid.load(Ordering::Relaxed) {
-            return;
-        }
-
-        self.port.client_data[self.index()].set(data);
-    }
-}
-
-impl<'a, P: PinNum> hil::Controller for Pin<'a, P> {
-    type Config = functions::Function<P>;
-
-    fn configure(&self, config: Self::Config) {
-        self.claim_as(config);
-    }
-}
-
-impl<'a> hil::Controller for Gpio<'a> {
-    type Config = (hil::gpio::FloatingState, hil::gpio::InterruptEdge);
-
-    fn configure(&self, config: Self::Config) {
-        self.set_input_mode(config.0);
-        self.set_interrupt_mode(config.1);
-    }
 }
 
 impl<'a> hil::gpio::Configure for Gpio<'a> {
-    fn disable_input(&self) {
-        unimplemented!();
+    fn disable_input(&self) -> hil::gpio::Configuration {
+        self.make_output()
     }
 
-    fn disable_output(&self) {
-        unimplemented!();
+    fn disable_output(&self) -> hil::gpio::Configuration {
+        self.make_input()
     }
 
-    fn make_output(&self) {
+    fn make_output(&self) -> hil::gpio::Configuration {
         self.enable_output();
+        self.configuration()
     }
 
-    fn make_input(&self) {
+    fn make_input(&self) -> hil::gpio::Configuration {
         self.disable_output();
+        self.configuration()
     }
 
     fn set_floating_state(&self, mode: hil::gpio::FloatingState) {
@@ -386,6 +345,14 @@ impl<'a> hil::gpio::Configure for Gpio<'a> {
     fn deactivate_to_low_power(&self) {
         unimplemented!();
     }
+
+    fn configuration(&self) -> hil::gpio::Configuration {
+        match self.regs().direction[self.index()].get() == 1 {
+            false => hil::gpio::Configuration::Output,
+            true  => hil::gpio::Configuration::Input,
+        }
+
+    }
 }
 
 impl<'a> hil::gpio::Input for Gpio<'a> {
@@ -395,8 +362,9 @@ impl<'a> hil::gpio::Input for Gpio<'a> {
 }
 
 impl<'a> hil::gpio::Output for Gpio<'a> {
-    fn toggle(&self) {
+    fn toggle(&self) -> bool {
         self.toggle();
+        self.read()
     }
 
     fn set(&self) {
@@ -413,10 +381,9 @@ impl<'a> hil::gpio::Interrupt for Gpio<'a> {
         Gpio::set_client(self, client);
     }
 
-    fn enable_interrupts(&self, client_data: usize, mode: hil::gpio::InterruptEdge) {
-        Gpio::enable_interrupt(self);
+    fn enable_interrupts(&self,  mode: hil::gpio::InterruptEdge) {
         self.set_interrupt_mode(mode);
-        self.set_client_data(client_data);
+        Gpio::enable_interrupt(self);
     }
 
     fn disable_interrupts(&self) {

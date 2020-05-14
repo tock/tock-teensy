@@ -216,7 +216,7 @@ pub enum SpiRole {
 
 pub struct Spi<'a> {
     regs: *mut Registers,
-    client: Cell<Option<&'a SpiMasterClient>>,
+    client: Cell<Option<&'a dyn SpiMasterClient>>,
     index: usize,
     chip_select_settings: [Cell<u32>; 6],
     write: TakeCell<'static, [u8]>,
@@ -281,7 +281,7 @@ impl<'a> Spi<'a> {
         };
     }
 
-    fn set_client(&self, client: &'a SpiMasterClient) {
+    fn set_client(&self, client: &'a dyn SpiMasterClient) {
         self.client.set(Some(client));
     }
 
@@ -528,7 +528,7 @@ impl<'a> Spi<'a> {
 impl<'a> SpiMaster for Spi<'a> {
     type ChipSelect = u32;
 
-    fn set_client(&self, client: &'static SpiMasterClient) {
+    fn set_client(&self, client: &'static dyn SpiMasterClient) {
         Spi::set_client(self, client);
     }
 

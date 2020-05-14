@@ -48,7 +48,7 @@ pub const PIT_ADDRS: [*mut PitRegisters; 4] = [0x4003_7100 as *mut PitRegisters,
 pub static mut PIT: Pit<'static> = Pit::new();
 
 pub struct Pit<'a> {
-    pub client: Cell<Option<&'a AlarmClient>>,
+    pub client: Cell<Option<&'a dyn AlarmClient>>,
     alarm: Cell<u32>
 }
 
@@ -119,7 +119,7 @@ impl<'a> Pit<'a> {
         self.pit(2).tctrl.modify(TimerControl::TIE::CLEAR);
     }
 
-    pub fn set_client(&self, client: &'a AlarmClient) {
+    pub fn set_client(&self, client: &'a dyn AlarmClient) {
         self.client.set(Some(client));
     }
 
@@ -140,25 +140,21 @@ impl Frequency for PitFrequency {
 
 impl<'a> Time for Pit<'a> {
     type Frequency = PitFrequency;
-    fn disable(&self) {
-        Pit::disable(self);
-        self.disable_interrupt();
-        self.clear_pending();
-    }
-
-    fn is_armed(&self) -> bool {
-        self.is_enabled()
-    }
-}
-
-impl<'a> Alarm for Pit<'a> {
+    
     fn now(&self) -> u32 {
         self.regs().ltmr64h.get();
         ::core::u32::MAX - self.regs().ltmr64l.get()
     }
 
+    fn max_tics(&self) -> u32 {
+        core::u32::MAX
+    }
+}
+
+impl<'a> Alarm<'a> for Pit<'a> {
+    
     fn set_alarm(&self, ticks: u32) {
-        Time::disable(self);
+        self.disable();
         self.alarm.set(ticks.wrapping_sub(self.now()));
         self.set_counter(self.alarm.get());
         self.enable_interrupt();
@@ -168,4 +164,25 @@ impl<'a> Alarm for Pit<'a> {
     fn get_alarm(&self) -> u32 {
         self.alarm.get()
     }
+
+    fn set_client(&'a self, client: &'a dyn AlarmClient) {
+        Pit::set_client(self, client);
+    }
+
+    fn is_enabled(&self) -> bool {
+        Pit::is_enabled(self)
+    }
+
+    fn enable(&self) {
+        self.clear_pending();
+        Pit::enable(self);
+        self.enable_interrupt();
+    }
+
+    fn disable(&self) {
+        Pit::disable(self);
+        self.disable_interrupt();
+        self.clear_pending();
+    }
+
 }
