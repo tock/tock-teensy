@@ -6,13 +6,13 @@ use mk66;
 type PinHandle = &'static mk66::gpio::Gpio<'static>;
 
 pub struct LedComponent {
-    leds: Option<&'static [(&'static mk66::gpio::Gpio<'static>, capsules::led::ActivationMode)]>
+    leds: Option<&'static [(&'static mk66::gpio::Gpio<'static>, kernel::hil::gpio::ActivationMode)]>
 }
 
 impl LedComponent {
-    pub fn new() -> Self {
+    pub fn new(leds: &'static [(PinHandle, kernel::hil::gpio::ActivationMode)]) -> Self {
         LedComponent {
-            leds: None
+            leds: Some(leds)
         }
     }
 }
@@ -31,14 +31,6 @@ impl Component for LedComponent {
             );
 
         Some(leds)
-    }
-}
-
-impl ComponentWithDependency<&'static [(PinHandle, capsules::led::ActivationMode)]> for LedComponent {
-    fn dependency(&mut self, leds: &'static [(PinHandle, capsules::led::ActivationMode)]) -> &mut Self {
-        self.leds = Some(leds);
-
-        self
     }
 }
 

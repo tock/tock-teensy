@@ -395,6 +395,9 @@ impl<'a> hil::gpio::Interrupt for Gpio<'a> {
     } 
 }
 
+impl<'a> hil::gpio::Pin for Gpio<'a> {}
+impl<'a> hil::gpio::InterruptPin for Gpio<'a> {}
+
 macro_rules! pins {
     {$($port:ident [$($pintype:ident $pinname:ident $pinnum:expr),*]),*} => {
         $(

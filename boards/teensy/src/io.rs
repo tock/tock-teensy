@@ -2,10 +2,12 @@ use core::fmt::*;
 use core::panic::PanicInfo;
 use kernel::hil::uart::{self, Configure};
 use kernel::hil::led;
+use kernel::debug::IoWrite;
 use kernel::debug;
 use mk66::{self, gpio};
 
 use crate::PROCESSES;
+use crate::CHIP;
 
 pub struct Writer {
     initialized: bool,
@@ -15,6 +17,12 @@ pub static mut WRITER: Writer = Writer { initialized: false };
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
+        self.write(s.as_bytes());
+        Ok(())
+    }
+}
+impl IoWrite for Writer {
+    fn write(&mut self, buf: &[u8]) {
         let uart = unsafe { &mut mk66::uart::UART0 };
         if !self.initialized {
             self.initialized = true;
@@ -28,12 +36,10 @@ impl Write for Writer {
             uart.enable_tx();
         } 
 
-        for c in s.bytes() {
+        for &c in buf {
             uart.send_byte(c);
         }
         while !uart.tx_ready() {}
-
-        Ok(())
     }
 }
 
@@ -47,7 +53,7 @@ pub unsafe extern "C" fn panic_fmt(pi: &PanicInfo) -> ! {
     gpio::PC05.release_claim();
     let led = &mut led::LedLow::new(gpio::PC05.claim_as_gpio());
 
-    debug::panic(&mut [led], writer, pi, &cortexm4::support::nop, &PROCESSES)
+    debug::panic(&mut [led], writer, pi, &cortexm4::support::nop, &PROCESSES, &CHIP)
 }
 
 #[macro_export]
